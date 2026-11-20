@@ -10,8 +10,8 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
-  "files": ["lib", "src", "vendor", "scripts", "tests", "tsconfig.json", "cordis.patch.yml", "dsh-focus-config.json", "dsh-focus-output-prompt.md", "README.md", "LICENSE", "LICENSE-APACHE-2.0.txt", "THIRD_PARTY_NOTICES.md"],
-  "engines": {"node": ">=20", "dsh": "0.2.2-rc.5"},
+  "files": ["lib", "src", "vendor", "scripts", "tests", "tsconfig.json", "cordis.patch.yml", "dsh-focus-config.json", "dsh-focus-output-prompt.md", "README.md", "README.en.md", "LICENSE", "LICENSE-APACHE-2.0.txt", "THIRD_PARTY_NOTICES.md"],
+  "engines": {"node": ">=20", "dsh": "<=0.2.2-rc.5"},
   "dsh": {
     "bundle": {"patch": "./cordis.patch.yml"},
     "client": {
