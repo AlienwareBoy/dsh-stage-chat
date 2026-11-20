@@ -1,50 +1,56 @@
 # dsh-focus
 
-[中文](README.md)
+[中文](README.md) · **English**
 
-dsh-focus is a conversation view for DeepSeek Harness. A turn reads from top to bottom: **what is running**, **the answer**, and **what needs confirmation**. The active stage stays in view, finished steps fold back into that stage, and the final reply stands on its own.
+dsh-focus is a stage-based conversation view for DeepSeek Harness. It replaces the built-in Chat view and organizes one turn into three sections, in order: execution, result, and items awaiting confirmation.
 
-It supports **DeepSeek Harness 0.2.2-rc.5 and earlier releases**. After installation it takes the place of the built-in Chat view and follows the Harness light, dark, and system themes.
+| Item | Value |
+| --- | --- |
+| Package | `dsh-focus` |
+| Version | 0.1.3 |
+| Compatibility | DeepSeek Harness 0.2.2-rc.5 and earlier |
+| Mount point | `chat`, priority `-100` |
+| License | [MIT](LICENSE) |
 
-## Demo
+## Interface
 
-The active stage is a single line. Steps that have already returned are listed under it, each with its status.
+The execution section states the active stage and lists the steps that have already returned, each with its status.
 
-![Execution: the active stage and completed steps](docs/execution-process.png)
+![Active stage and completed steps](docs/execution-process.png)
 
-Further down the same turn, the answer is a separate block. A step that is still running is marked in progress. A step that has not started yet stays waiting.
+The result of the same turn is a separate section. A step still in progress is marked running. A step that has not started is marked waiting.
 
-![Execution and the answer](docs/execution-result.png)
+![Execution and result](docs/execution-result.png)
 
-The full walkthrough is in the [demo video](docs/demo.mp4).
+The full interaction is in the [demo video](docs/demo.mp4).
 
-## Install
+## Installation
 
-DeepSeek Harness needs to be installed locally.
+DeepSeek Harness must already be installed.
 
 ```bash
 dsh plugin --profile web add github:AlienwareBoy/dsh-chat-view
 ```
 
-Reload the client after installing. The composer, approvals, and the other views stay with Harness. This plugin registers as `chat` at priority `-100`.
+Reload the client after installation. The composer, approvals, and the other views remain part of Harness. Colors follow the host light theme, dark theme, and system setting.
 
-## How a turn is shown
+On the desktop app, install the plugin from the in-app plugin manager and reload the window.
 
-- **Execution.** The public stage notes, plus the tool calls that actually happened in that stage. When the model does not name a stage, those calls are grouped under “Doing the task.”
-- **Answer.** The text the model actually wrote. A successful tool call is not treated as the answer.
-- **Needs confirmation.** Shown only when something is waiting. Approval still happens in the Harness composer.
+## Presentation
 
-Only the active stage carries the moving highlight. The highlight stops when that step finishes, fails, is interrupted, or pauses for approval. It also stays off when the system setting “Reduce motion” is on.
+- **Execution** contains the public stage notes and the tool calls that occurred inside that stage. When the model does not name a stage, those calls are filed under “Doing the task.”
+- **Result** is the final text written by the model. A successful tool call is not a result.
+- **Awaiting confirmation** appears only when an item is pending. Confirmation stays in the Harness composer.
 
-The left edge is a rail of turn anchors for the current session. An anchor grows as the pointer approaches, a hover shows that turn’s prompt and reply preview, and a click jumps to the turn.
+Only the active stage shows the moving highlight. The highlight stops when that stage finishes, fails, is interrupted, or waits for approval. It does not play when the system setting “Reduce motion” is enabled.
 
-Mermaid fences in the answer are drawn locally. You can open the source, zoom the diagram, and download the full Markdown for the turn.
+The left side of the session is a rail of turn anchors. An anchor enlarges as the pointer approaches. Hovering shows that turn’s prompt and reply summary. Activating an anchor jumps to the turn.
 
-The view shows public text, tool arguments, and tool results.
+Mermaid fences in the result are rendered locally. The view can show the source, zoom the diagram, and download the full Markdown for the turn. It shows public text, tool arguments, and tool results.
 
-## Settings
+## Configuration
 
-Open **Conversation display** in the Harness settings. From there you can change the colors, edit the configuration JSON and the reply rules, then save. The reply rules apply on the next model request. The rest of the system prompt is left as it is. The reply rules can be empty.
+Open **Conversation display** in the Harness settings. Adjust the colors, edit the configuration JSON and the reply rules, then save. The reply rules take effect on the next model request and do not rewrite the rest of the system prompt. The reply rules may be empty.
 
 ## Build from source
 
@@ -56,14 +62,8 @@ npm test
 npm pack
 ```
 
-These commands do not start Harness. The packed `dsh-focus-0.1.3.tgz` can also be installed locally:
+These commands do not start Harness. The packed archive can be installed locally:
 
 ```bash
 dsh plugin --profile web add ./dsh-focus-0.1.3.tgz
 ```
-
-On the desktop app, install it from the in-app plugin manager and reload the window.
-
-## License
-
-[MIT](LICENSE)
