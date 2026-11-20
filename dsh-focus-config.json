@@ -1,0 +1,283 @@
+{
+  "format": "dsh-focus-design-initializer",
+  "version": 2,
+  "target": {
+    "name": "dsh-focus",
+    "view": "conversation.view",
+    "locale": "zh-CN",
+    "contract": "自定义设计与初始化约定，非 DSH 官方配置协议"
+  },
+  "appearance": {
+    "defaultTheme": "dark",
+    "accent": "#FF7500",
+    "accentBackground": "rgba(255,117,0,.08)",
+    "statusColors": {
+      "completed": {"light": "#2971B8", "dark": "#64A8F0"},
+      "failed": "#FF3B30",
+      "warning": "#FF7500",
+      "usage": "完成勾为蓝色；失败为红色；警告和待确认标记为橙色。正文保持中性文字。"
+    },
+    "faultPair": {
+      "error": "#FF3B30",
+      "diagnostic": "#2971B8",
+      "alwaysPaired": true
+    },
+    "themes": {
+      "light": {
+        "bg": "#FFFFFF",
+        "surface": "#F7F8FA",
+        "sidebar": "#F7F8FA",
+        "text": "#202124",
+        "secondary": "#60646C",
+        "subtle": "#8B8F97",
+        "border": "rgba(10,10,10,.16)",
+        "hover": "rgba(10,10,10,.07)",
+        "bubble": "#F3F4F6",
+        "node-line": "rgba(10,10,10,.07)",
+        "metal-top": "#F7F8FA",
+        "metal-mid": "#F7F8FA",
+        "metal-bottom": "#FFFFFF",
+        "metal-edge-high": "rgba(10,10,10,.07)",
+        "metal-edge-mid": "rgba(10,10,10,.16)",
+        "metal-edge-low": "rgba(10,10,10,.07)",
+        "metal-edge-glint": "rgba(255,255,255,.9)",
+        "metal-edge-shade": "rgba(10,10,10,.26)",
+        "metal-shine": "rgba(255,255,255,.32)",
+        "metal-inset": "rgba(255,255,255,.72)",
+        "metal-shadow": "rgba(10,10,10,.1)"
+      },
+      "dark": {
+        "bg": "#202022",
+        "surface": "#29292C",
+        "sidebar": "#29292C",
+        "text": "#E4E4E7",
+        "secondary": "#B0B0B8",
+        "subtle": "#8B8B93",
+        "border": "rgba(236,234,230,.16)",
+        "hover": "rgba(236,234,230,.07)",
+        "bubble": "#303034",
+        "node-line": "rgba(236,234,230,.07)",
+        "metal-top": "#29292C",
+        "metal-mid": "#29292C",
+        "metal-bottom": "#202022",
+        "metal-edge-high": "rgba(236,234,230,.38)",
+        "metal-edge-mid": "rgba(236,234,230,.16)",
+        "metal-edge-low": "rgba(236,234,230,.07)",
+        "metal-edge-glint": "rgba(236,234,230,.76)",
+        "metal-edge-shade": "rgba(0,0,0,.72)",
+        "metal-shine": "rgba(236,234,230,.07)",
+        "metal-inset": "rgba(236,234,230,.16)",
+        "metal-shadow": "rgba(0,0,0,.23)"
+      }
+    },
+    "fonts": {
+      "body": ["PingFang SC", "Microsoft YaHei", "system-ui", "sans-serif"],
+      "display": ["DIN Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "PingFang SC", "Microsoft YaHei", "sans-serif"],
+      "mono": ["SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", "monospace"],
+      "webfonts": false
+    },
+    "metal": {
+      "bubbleRadiusPx": 10,
+      "stepRadiusPx": 6,
+      "borderWidthPx": 2,
+      "rimFlowEnabled": true,
+      "rimFlowDurationMs": 2400,
+      "rimFlowOpacity": 0.85,
+      "rimFlowScope": "runningTaskItemsOnly",
+      "rimFlowStatuses": ["running"],
+      "rimFlowConcurrency": 1,
+      "executionOrder": "sequential",
+      "stopRimFlowOn": ["succeeded", "failed", "interrupted", "awaitingConfirmation", "awaitingApproval"],
+      "outerSectionsAnimated": false,
+      "completedRim": "移除流光及固定金属高光，恢复均匀低对比边框，不定格流光",
+      "rimImplementation": "运行 item 使用静态金属环与 SVG 圆角矩形 pathLength=100 流光，每 2400ms 沿完整周长匀速绕圈；更新和展开不重启动画，其他状态不显示流光",
+      "gradientAngleDeg": 175,
+      "centerStopPercent": 48,
+      "shinePosition": "50% 12%",
+      "shineFadePercent": 70,
+      "shadowOffsetPx": 5,
+      "shadowBlurPx": 12
+    },
+    "typography": {
+      "bodyPx": 13,
+      "finalReplyPx": 12,
+      "markdownPx": 11,
+      "codePx": 10,
+      "resultTitlePx": 22,
+      "mobileResultTitlePx": 19,
+      "lineHeight": 1.85
+    },
+    "layout": {
+      "contentMaxWidthPx": 1600,
+      "replyPaddingXPx": 10,
+      "sectionGapPx": 8,
+      "mobileBreakpointPx": 600,
+      "preferIntegerSpacing": true,
+      "order": ["executionProcess", "finalReply", "pendingActions"],
+      "finalReply": "完整 Markdown 正文与产物入口，默认展开，不做摘要截断",
+      "executionProcess": "运行时任务 item 可见，仅正在执行的 item 流光；完成后外层可折叠，任务与步骤独立折叠",
+      "runningResult": "小字等待提示 → 当前执行位置 → 已返回的阶段结果；最终答复产出后展示完整正文"
+    },
+    "motion": {
+      "transitionMs": 180,
+      "respectReducedMotion": true
+    }
+  },
+  "interaction": {
+    "finalReplyOpen": true,
+    "processOpen": false,
+    "runningProcessOpen": true,
+    "taskOpen": false,
+    "stepOpen": false,
+    "confirmationOpen": false,
+    "approvalOpen": false,
+    "errorOpen": false,
+    "fullTraceOpen": false,
+    "independentNodes": true,
+    "preserveOpenWhileStreaming": true,
+    "preserveReadingPosition": true,
+    "keepPendingActionsVisible": true,
+    "showEvidence": true,
+    "copyFinalReply": "完整 Markdown + 产物名称与地址",
+    "copyDesignPackage": "修改要求 + agent 提示词 + 完整初始化 JSON",
+    "clipboardFallback": "选中可见文本框，允许手动复制",
+    "persist": ["theme", "autoFold", "showEvidence"],
+    "resetConversationOnInitialize": true
+  },
+  "pluginSettings": {
+    "entryLabel": "对话显示",
+    "editable": ["appearance", "outputPrompt", "content.templates", "interaction"],
+    "fixed": ["sectionOrder", "singleMarkdownRenderer", "truthfulTaskStates", "runningTaskItemsOnly", "emptyConversationInitialization"],
+    "outputPromptFile": "dsh-focus-output-prompt.md",
+    "designPromptFile": "dsh-focus-agent-prompt.md",
+    "settingsBundleFormat": "dsh-focus-plugin-settings",
+    "hostPersistence": "保存到实际 DSH 插件配置，具体入口由目标版本适配",
+    "previewPersistence": "浏览器 localStorage；离线预览保存不影响真实 DSH 或 agent"
+  },
+  "content": {
+    "labels": {
+      "finalReply": "执行结果",
+      "copyResult": "复制完整结果",
+      "downloadResult": "下载完整 Markdown",
+      "executionProcess": "执行过程",
+      "confirmation": "需要确认",
+      "fullTrace": "完整工具轨迹",
+      "artifacts": "本轮产物",
+      "emptyTitle": "开始一段任务对话",
+      "emptyDescription": "发送消息后，最终答复、产物、当前进展与待处理事项会逐步出现。",
+      "running": "执行中",
+      "queued": "等待执行",
+      "finalReplyTask": "整理最终结果",
+      "produced": "已产出",
+      "completed": "检查结束",
+      "pending": "待确认",
+      "failed": "执行失败",
+      "approval": "等待你批准",
+      "copyPackage": "复制 JSON + 提示词"
+    },
+    "templates": {
+      "sectionHeading": "# {{sectionNumber}}. {{sectionTitle}}",
+      "sectionSummary": "# {{sectionNumber}}. {{sectionTitle}}\n\n{{summaryMarkdown}}",
+      "taskSummary": "**{{title}}** `{{scheduledAt}}`\n\n{{statusMarkdown}}",
+      "liveProgress": "**正在检查** · `{{completed}} / {{total}}` 项检查完成",
+      "liveSummary": "### 当前执行\n\n## {{action}}\n\n{{description}}\n\n### 目前的结果\n\n{{findingsMarkdown}}",
+      "waitingFinal": "# 2. 执行结果\n\n> 流程运行中，请等待。最终答复尚未生成。",
+      "liveTaskOverview": "# 1. 当前检查\n\n- 任务：**{{title}}**（`{{taskId}}`）。\n- 进度：**{{completed}} / {{total}}** 步完成。\n- 执行与通知：{{executionLabel}}；{{deliveryLabel}}。\n\n> {{conclusion}}\n\n# 2. 检查顺序\n\n等待执行与执行中的步骤不显示尚未返回的结果。",
+      "finalReplyTask": "# 1. 最终答复产出\n\n{{statusMarkdown}}\n\n> 本项执行结束后停止流光；完整最终答复展示在执行结果区。\n\n# 2. 产出依据\n\n只使用本轮已经返回的任务运行记录、通知回执与实际检查结果。",
+      "confirmationBody": "**{{question}}**\n\n{{statusMarkdown}}",
+      "emptyMessage": "# {{title}}\n\n{{description}}",
+      "sourceSummary": "**来源**：{{sources}} · 演示数据",
+      "taskOverview": "# 1. 任务概览\n\n- 任务：**{{title}}**（`{{taskId}}`）。\n- 计划时间：**{{scheduledAt}}**；执行完成：**{{finishedAt}}**。\n- 通知状态：**{{deliveryLabel}}**。\n\n> {{conclusion}}\n\n# 2. 检查顺序\n\n展开任一步骤，查看执行内容、关键发现和原始返回。",
+      "stepDetail": "# 1. 执行内容\n\n{{executionMarkdown}}\n\n## {{inputLabel}}\n\n```{{inputLanguage}}\n{{inputText}}\n```\n\n# 2. 返回结果\n\n{{findingsMarkdown}}\n\n> {{conclusion}}\n\n{{outputMarkdown}}",
+      "confirmation": "# 1. 已做的检查\n\n{{checksMarkdown}}\n\n# 2. 当前发现\n\n{{findingsMarkdown}}\n\n> {{conclusion}}\n\n## 执行依据\n\n```text\n{{evidenceText}}\n```",
+      "approval": "# 1. 待执行操作\n\n{{operationMarkdown}}\n\n# 2. 授权与状态\n\n{{statusMarkdown}}\n\n> {{conclusion}}\n\n## 工具参数\n\n```text\n{{inputText}}\n```",
+      "failure": "# 1. 失败位置\n\n{{failureMarkdown}}\n\n# 2. 影响范围\n\n{{impactMarkdown}}\n\n> {{conclusion}}\n\n# 3. 执行命令 / 工具\n\n```text\n{{inputText}}\n```\n\n# 4. 原始错误\n\n```json\n{{errorJson}}\n```",
+      "artifact": "- **{{name}}**：{{description}}\n  {{uri}}"
+    },
+    "markdown": {
+      "scope": ["userMessages", "sectionHeadings", "summaries", "statuses", "process", "finalReply", "confirmations", "approvals", "failures", "emptyState"],
+      "singleRenderer": true,
+      "finalReplySource": "宿主公开最终答复；明确的过程和确认章节分区显示，结果正文保留全部 Markdown 与链接，下载保留原始完整答复",
+      "blocks": ["headings", "orderedLists", "unorderedLists", "blockquotes", "fencedCode", "paragraphs"],
+      "inline": ["bold", "code", "links"],
+      "hostRendererPreferred": true,
+      "escapeRawHtml": true,
+      "codeWrap": true
+    },
+    "rules": [
+      "工具成功、任务完成、业务结果达成分别记录。",
+      "缺少回执、产物或最终答复时保留未确认或等待状态，不补造成功内容。",
+      "用户确认作为独立来源，保留原始工具记录。",
+      "最终答复与产物入口必须保留，不能只显示执行过程或 OK 状态。",
+      "会话文案统一通过 Markdown 渲染；展示顺序为执行过程、执行结果、需要确认。",
+      "流光仅标记 execution 为 running 的任务 item；外层过程、结果、用户消息、确认与审批不播放流光。",
+      "任务按顺序执行：前一项结束后下一项才开始；等待项静态，同一轮仅当前执行 item 流光。",
+      "完成后移除流光与固定金属高光，不暂停定格；完成勾蓝色、失败红色、警告与待确认橙色。",
+      "任务检查完成即停止流光；送达待确认不等于任务仍在运行。",
+      "最终答复生成属于独立任务 item；该项完成且完整最终答复产出后停止流光。",
+      "运行中的结果区保留小字等待提示、当前执行位置与已确认的阶段结果，不提前展示最终正文或产物入口。",
+      "流式执行只显示已返回的结果；审批获准仍须等待实际执行。",
+      "故障红蓝标记在展开与折叠时均成对出现。"
+    ]
+  },
+  "initialState": {
+    "sessionId": null,
+    "status": "idle",
+    "messages": [],
+    "finalReply": null,
+    "artifacts": [],
+    "tasks": [],
+    "steps": [],
+    "confirmations": [],
+    "approvals": [],
+    "errors": [],
+    "sourceRefs": [],
+    "openedNodeIds": [],
+    "closedNodeIds": []
+  },
+  "dataContract": {
+    "finalReply": {
+      "id": "宿主消息 ID",
+      "status": "streaming | completed | interrupted",
+      "markdown": "完整最终答复",
+      "artifactIds": [],
+      "sourceRefs": []
+    },
+    "artifact": {
+      "id": "产物 ID",
+      "name": "文件或结果名称",
+      "type": "file | link | report | code | other",
+      "uri": "真实文件或链接地址",
+      "description": "用途说明",
+      "status": "available | pending | failed",
+      "sourceRef": "生成该产物的消息或工具结果 ID"
+    },
+    "task": {
+      "id": "任务 ID",
+      "title": "任务名称",
+      "execution": "unknown | queued | running | succeeded | failed | interrupted",
+      "kind": "business | finalReply",
+      "outcome": "unknown | confirmed | unconfirmed | failed",
+      "stepIds": [],
+      "sourceRefs": []
+    },
+    "step": {
+      "id": "稳定节点 ID",
+      "callId": "宿主工具调用 ID",
+      "title": "公开的执行动作",
+      "tool": "工具名称",
+      "status": "queued | running | succeeded | failed | interrupted",
+      "input": null,
+      "output": null,
+      "summaryMarkdown": "",
+      "sourceRefs": []
+    }
+  },
+  "preview": {
+    "defaultPlan": "focus",
+    "defaultState": "done",
+    "demoLabel": "演示数据 · 非真实会话",
+    "initializerQuery": "?initialize=1",
+    "useDemoDataInPlugin": false
+  }
+}
