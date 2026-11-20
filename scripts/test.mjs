@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { mkdir } from "node:fs/promises";
-const output = process.env.DSH_CHECK_DIR || "/tmp/dsh-focus-013-checks";
+const output = process.env.DSH_CHECK_DIR || "/tmp/dsh-stage-chat-013-checks";
 await mkdir(output, { recursive: true });
 await build({ entryPoints: ["tests/lifecycle.test.ts"], outfile: `${output}/lifecycle.mjs`,
   bundle: true, platform: "node", format: "esm", loader: { ".md": "text" } });

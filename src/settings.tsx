@@ -60,7 +60,7 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
     return String(obj[keys.at(-1)!]);
   };
   const disabled = busy || snapshot.status !== "ready" || !snapshot.writable;
-  return <section data-dsh-focus-settings>
+  return <section data-dsh-stage-chat-settings>
     <p>执行过程 → 执行结果 → 需要确认。仅当前运行项流光，完成后移除高光。</p>
     <div className="focus-settings-colors">{colors.map(([label, path]) =>
       <label key={path}>{label}<input type="color" value={color(path)} disabled={disabled}
@@ -79,8 +79,8 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
         setPrompt(outputPromptOf(snapshot.value?.outputPrompt)); revision.current = snapshot.revision;
       }}>重新载入</button>
       <button onClick={() => {
-        try { download(JSON.stringify({ format: "dsh-focus-plugin-settings", version: 1,
-          configuration: parseDesign(json), outputPrompt: prompt }, null, 2), "dsh-focus-plugin-settings.json"); }
+        try { download(JSON.stringify({ format: "dsh-stage-chat-plugin-settings", version: 1,
+          configuration: parseDesign(json), outputPrompt: prompt }, null, 2), "dsh-stage-chat-plugin-settings.json"); }
         catch (e) { setNote(String(e)); }
       }}>导出设置 JSON</button>
     </div>

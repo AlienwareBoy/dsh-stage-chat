@@ -19,7 +19,7 @@ export function apply(ctx: Context, config: Config): void {
   });
   ctx.inject(["systemPrompt"], child => {
     child.effect(() => child.systemPrompt.section({
-      name: "dsh-focus-output",
+      name: "dsh-stage-chat-output",
       order: 90,
       text: () => outputPromptOf(config.outputPrompt.get()),
       interpolate: false

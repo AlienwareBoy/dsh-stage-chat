@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
-const output = process.env.DSH_CHECK_DIR || "/tmp/dsh-focus-013-checks";
+const output = process.env.DSH_CHECK_DIR || "/tmp/dsh-stage-chat-013-checks";
 await (await import("node:fs/promises")).mkdir(output, { recursive: true });
 await build({
   entryPoints: ["tests/host-fixture.tsx"], outfile: `${output}/host-fixture.js`,

@@ -53,5 +53,5 @@ with sync_playwright() as p:
     checks.append("减少动态效果模式停用流光")
     assert not errors, errors
     browser.close()
-(root / "dsh-focus" / "preview-checks.json").write_text(json.dumps(checks,ensure_ascii=False,indent=2)+"\n")
+(root / "dsh-stage-chat" / "preview-checks.json").write_text(json.dumps(checks,ensure_ascii=False,indent=2)+"\n")
 print(json.dumps(checks,ensure_ascii=False,indent=2))

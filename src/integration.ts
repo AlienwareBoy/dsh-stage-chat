@@ -9,7 +9,7 @@ export function installChatTabDedup(): () => void {
       const tabs = Array.from(row.querySelectorAll<HTMLElement>(":scope > [role=tab]"));
       const first = tabs[0]?.textContent?.trim();
       tabs.forEach((tab, i) => {
-        tab.toggleAttribute("data-dsh-focus-duplicate-tab", first === "对话" && i > 0 && tab.textContent?.trim() === first);
+        tab.toggleAttribute("data-dsh-stage-chat-duplicate-tab", first === "对话" && i > 0 && tab.textContent?.trim() === first);
       });
     });
   };
@@ -18,7 +18,7 @@ export function installChatTabDedup(): () => void {
   update();
   return () => {
     observer.disconnect();
-    document.querySelectorAll("[data-dsh-focus-duplicate-tab]").forEach(tab =>
-      tab.removeAttribute("data-dsh-focus-duplicate-tab"));
+    document.querySelectorAll("[data-dsh-stage-chat-duplicate-tab]").forEach(tab =>
+      tab.removeAttribute("data-dsh-stage-chat-duplicate-tab"));
   };
 }

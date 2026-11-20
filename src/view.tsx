@@ -278,7 +278,7 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
   }, []);
   return <ChartTheme.Provider value={light}><MarkdownDelegateProvider renderCode={renderCode} openFile={async path => openFile(path)}
     openExternalLink={url => { window.open(url, "_blank", "noopener,noreferrer"); }}>
-    <div data-dsh-focus data-theme={light ? "light" : "dark"} style={themeStyle(d, light)}
+    <div data-dsh-stage-chat data-theme={light ? "light" : "dark"} style={themeStyle(d, light)}
       onPointerDownCapture={event => { if ((event.target as Element).closest("summary")) follow.current = false; }}
       onClickCapture={event => {
         const link = (event.target as Element).closest<HTMLAnchorElement>("a[href]");

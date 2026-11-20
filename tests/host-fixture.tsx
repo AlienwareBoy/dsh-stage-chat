@@ -7,8 +7,8 @@ import { MarkdownText, MarkdownDelegateProvider, FenceCodeBlock, FenceMathBlock 
 import { SlotCore } from "@deepseek-ai/dsh-client-ui-slots";
 import nativeCss from "../node_modules/@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/ConversationRoot.module.css";
 import plugin from "../lib/client.js?text";
-import defaults from "../dsh-focus-config.json";
-import prompt from "../dsh-focus-output-prompt.md";
+import defaults from "../dsh-stage-chat-config.json";
+import prompt from "../dsh-stage-chat-output-prompt.md";
 
 function store<T>(value: T) {
   const listeners = new Set<() => void>();
@@ -72,7 +72,7 @@ const tabs = store(slots.entries("conversation.view"));
 slots.subscribe("conversation.view", () => tabs.set(slots.entries("conversation.view")));
 let pluginExports: any;
 (window as any).__ModuleLoader__ = { load({ id, factory }: any) {
-  if (id !== "dsh-focus") throw new Error("Unexpected plugin module");
+  if (id !== "dsh-stage-chat") throw new Error("Unexpected plugin module");
   pluginExports = factory((name: string) => {
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return jsxRuntime;

@@ -15,7 +15,7 @@ with sync_playwright() as p:
         print("Browser error:", error, flush=True)
     page.on("pageerror", page_error)
     page.goto((root / ".checks/host-fixture.html").as_uri())
-    expect(page.locator("[data-dsh-focus]")).to_be_visible()
+    expect(page.locator("[data-dsh-stage-chat]")).to_be_visible()
     expect(page.get_by_role("tab",name="对话")).to_have_count(1)
     assert page.locator("[data-native-chat]").count() == 0
     page.evaluate("fixture.addView()")
@@ -35,7 +35,7 @@ with sync_playwright() as p:
           state:el.dataset.execution,flow:el.dataset.flow,
           animation:getComputedStyle(el.querySelector('rect')).animationName
         }))""")
-        assert all((n["flow"]=="on") == (n["animation"]=="dsh-focus-rim") for n in states)
+        assert all((n["flow"]=="on") == (n["animation"]=="dsh-stage-chat-rim") for n in states)
     page.evaluate("fixture.setStage(0)")
     active = page.locator(".focus-task[data-flow=on]")
     expect(active.locator("svg")).to_be_visible()
@@ -86,7 +86,7 @@ with sync_playwright() as p:
     assert "task-report.md" in page.evaluate("lastOpened")
     checks.append("审批暂停、完成停止流光；实际结果和文件打开委托保留，输入区仍可用")
 
-    sample_path = Path("/tmp/dsh-focus-public-final.md")
+    sample_path = Path("/tmp/dsh-stage-chat-public-final.md")
     sample = sample_path.read_text() if sample_path.exists() else "## 执行过程\n\n1. 核对来源。\n\n## 执行结果\n\n### 关键结论\n\n正文。\n\n[来源](https://example.com)\n\n## 需要确认\n\n无待办事项。"
     page.evaluate("(text)=>fixture.setFinal(text)",sample)
     result = page.locator(".focus-result")
@@ -108,7 +108,7 @@ with sync_playwright() as p:
     page.evaluate("fixture.setFinal('# 阅读结果\\n\\n完整正文。'); fixture.long(true)")
     scroller = page.locator("#native-scroll")
     assert scroller.evaluate("el=>el.scrollHeight>el.clientHeight")
-    assert page.locator("[data-dsh-focus]").evaluate("el=>getComputedStyle(el).overflowY") == "visible"
+    assert page.locator("[data-dsh-stage-chat]").evaluate("el=>getComputedStyle(el).overflowY") == "visible"
     scroller.evaluate("el=>el.scrollTop=100")
     page.wait_for_function("document.querySelector('#native-scroll').scrollTop===100")
     before = scroller.evaluate("el=>el.scrollTop")
@@ -132,7 +132,7 @@ with sync_playwright() as p:
     checks.append("使用实际 SDK ConversationRoot CSS：原生滚动容器可滚动，鼠标滚轮有效，读取新内容及加载历史保留阅读位置")
 
     page.evaluate("document.documentElement.style.colorScheme='light'")
-    expect(page.locator("[data-dsh-focus]")).to_have_attribute("data-theme","light")
+    expect(page.locator("[data-dsh-stage-chat]")).to_have_attribute("data-theme","light")
     page.set_viewport_size({"width":390,"height":844})
     assert page.evaluate("document.documentElement.scrollWidth<=window.innerWidth")
     checks.append("跟随宿主主题，390px 无横向溢出，无额外主题切换")
@@ -141,16 +141,16 @@ with sync_playwright() as p:
     field.fill("按顺序逐项执行，保留真实结果。")
     page.evaluate("fixture.accept(false)")
     page.get_by_role("button",name="保存并应用").click()
-    expect(page.locator("[data-dsh-focus-settings]")).to_contain_text("宿主未接受保存")
+    expect(page.locator("[data-dsh-stage-chat-settings]")).to_contain_text("宿主未接受保存")
     page.evaluate("fixture.accept(true)")
     page.get_by_role("button",name="保存并应用").click()
-    expect(page.locator("[data-dsh-focus-settings]")).to_contain_text("已保存并应用")
+    expect(page.locator("[data-dsh-stage-chat-settings]")).to_contain_text("已保存并应用")
     assert page.evaluate("fixture.saved().outputPrompt") == "按顺序逐项执行，保留真实结果。"
     design = json.loads(page.evaluate("fixture.saved().json"))
     design["appearance"]["statusColors"]["completed"]["light"] = "#8844CC"
     page.get_by_role("textbox",name="配置 JSON").fill(json.dumps(design,ensure_ascii=False))
     page.get_by_role("button",name="保存并应用").click()
-    expect(page.locator('[data-dsh-focus] .focus-mark[data-state=succeeded]').first).to_have_css("color","rgb(136, 68, 204)")
+    expect(page.locator('[data-dsh-stage-chat] .focus-mark[data-state=succeeded]').first).to_have_css("color","rgb(136, 68, 204)")
     saved = page.evaluate("fixture.saved().json")
     page.get_by_role("textbox",name="配置 JSON").fill("{invalid")
     page.get_by_role("button",name="保存并应用").click()
@@ -159,8 +159,8 @@ with sync_playwright() as p:
     page.emulate_media(reduced_motion="reduce")
     assert page.locator(".focus-rim-layer").evaluate_all("els=>els.every(el=>getComputedStyle(el).animationName==='none')")
     page.evaluate("fixture.dispose()")
-    assert page.locator("style[data-dsh-focus-styles]").count() == 0
-    assert page.locator("[data-dsh-focus-duplicate-tab]").count() == 0
+    assert page.locator("style[data-dsh-stage-chat-styles]").count() == 0
+    assert page.locator("[data-dsh-stage-chat-duplicate-tab]").count() == 0
     checks.append("配置接受/拒绝、用户配色、无效 JSON、减少动态效果及卸载清理均通过")
     assert not errors,errors
     browser.close()

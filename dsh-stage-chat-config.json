@@ -1,8 +1,8 @@
 {
-  "format": "dsh-focus-design-initializer",
+  "format": "dsh-stage-chat-design-initializer",
   "version": 2,
   "target": {
-    "name": "dsh-focus",
+    "name": "dsh-stage-chat",
     "view": "conversation.view",
     "locale": "zh-CN",
     "contract": "自定义设计与初始化约定，非 DSH 官方配置协议"
@@ -148,9 +148,9 @@
     "entryLabel": "对话显示",
     "editable": ["appearance", "outputPrompt", "content.templates", "interaction"],
     "fixed": ["sectionOrder", "singleMarkdownRenderer", "truthfulTaskStates", "runningTaskItemsOnly", "emptyConversationInitialization"],
-    "outputPromptFile": "dsh-focus-output-prompt.md",
-    "designPromptFile": "dsh-focus-agent-prompt.md",
-    "settingsBundleFormat": "dsh-focus-plugin-settings",
+    "outputPromptFile": "dsh-stage-chat-output-prompt.md",
+    "designPromptFile": "dsh-stage-chat-agent-prompt.md",
+    "settingsBundleFormat": "dsh-stage-chat-plugin-settings",
     "hostPersistence": "保存到实际 DSH 插件配置，具体入口由目标版本适配",
     "previewPersistence": "浏览器 localStorage；离线预览保存不影响真实 DSH 或 agent"
   },

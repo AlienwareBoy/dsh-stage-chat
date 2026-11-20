@@ -17,5 +17,5 @@ const result = await build({
   loader: { ".css": "text", ".md": "text" }
 });
 await writeFile("lib/client.js",
-  `window.__ModuleLoader__.load({id:"dsh-focus",factory:(require)=>{var module={exports:{}};var exports=module.exports;\n${result.outputFiles[0].text}\nreturn module.exports;}});\n`);
+  `window.__ModuleLoader__.load({id:"dsh-stage-chat",factory:(require)=>{var module={exports:{}};var exports=module.exports;\n${result.outputFiles[0].text}\nreturn module.exports;}});\n`);
 console.log("Built lib/index.js and lib/client.js");

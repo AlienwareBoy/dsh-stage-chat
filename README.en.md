@@ -1,12 +1,12 @@
-# dsh-focus
+# dsh-stage-chat
 
 [中文](README.md) · **English**
 
-dsh-focus is a stage-based conversation view for DeepSeek Harness. It replaces the built-in Chat view and organizes one turn into three sections, in order: execution, result, and items awaiting confirmation.
+dsh-stage-chat is a stage-based conversation view for DeepSeek Harness. It replaces the built-in Chat view and organizes one turn into three sections, in order: execution, result, and items awaiting confirmation.
 
 | Item | Value |
 | --- | --- |
-| Package | `dsh-focus` |
+| Package | `dsh-stage-chat` |
 | Version | 0.1.3 |
 | Compatibility | DeepSeek Harness 0.2.2-rc.5 and earlier |
 | Mount point | `chat`, priority `-100` |
@@ -29,7 +29,7 @@ The full interaction is in the [demo video](docs/demo.mp4).
 DeepSeek Harness must already be installed.
 
 ```bash
-dsh plugin --profile web add github:AlienwareBoy/dsh-chat-view
+dsh plugin --profile web add github:AlienwareBoy/dsh-stage-chat
 ```
 
 Reload the client after installation. The composer, approvals, and the other views remain part of Harness. Colors follow the host light theme, dark theme, and system setting.
@@ -65,5 +65,5 @@ npm pack
 These commands do not start Harness. The packed archive can be installed locally:
 
 ```bash
-dsh plugin --profile web add ./dsh-focus-0.1.3.tgz
+dsh plugin --profile web add ./dsh-stage-chat-0.1.3.tgz
 ```

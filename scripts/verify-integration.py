@@ -3,7 +3,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 import json
 
-output = Path("/tmp/dsh-focus-013-checks")
+output = Path("/tmp/dsh-stage-chat-013-checks")
 checks, errors = [], []
 diagrams = """# 检查结论
 
@@ -54,7 +54,7 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={"width": 1100, "height": 1000}, accept_downloads=True)
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto((output / "host-fixture.html").as_uri())
-    expect(page.locator("[data-dsh-focus]")).to_be_visible()
+    expect(page.locator("[data-dsh-stage-chat]")).to_be_visible()
     expect(page.get_by_role("tab", name="对话", exact=True)).to_have_count(1)
     assert not page.locator("[data-native-chat]").count()
     for label in ["播放流程", "下一阶段", "完整结果", "阶段进展与 Mermaid 预览", "金属对话", "切换浅色", "切换深色"]:
@@ -147,16 +147,16 @@ with sync_playwright() as p:
           document.documentElement.style.setProperty('--dsw-alias-label-primary',scheme==='light'?'#202124':'#e4e4e7');
           document.documentElement.style.setProperty('--dsw-alias-border-l1',scheme==='light'?'#d8d9dd':'#444449');
         }""", scheme)
-        expect(page.locator("[data-dsh-focus]")).to_have_attribute("data-theme", scheme)
+        expect(page.locator("[data-dsh-stage-chat]")).to_have_attribute("data-theme", scheme)
         expect(page.locator(".focus-chart-canvas > svg")).to_have_count(3)
         expected_bg = "rgb(255, 255, 255)" if scheme == "light" else "rgb(32, 32, 34)"
-        expect(page.locator("[data-dsh-focus]")).to_have_css("background-color", expected_bg)
+        expect(page.locator("[data-dsh-stage-chat]")).to_have_css("background-color", expected_bg)
         page.locator("#plugin-view").screenshot(path=str(output / f"result-{scheme}.png"))
     page.evaluate("document.documentElement.style.colorScheme='normal'")
     page.emulate_media(color_scheme="light")
-    expect(page.locator("[data-dsh-focus]")).to_have_attribute("data-theme", "light")
+    expect(page.locator("[data-dsh-stage-chat]")).to_have_attribute("data-theme", "light")
     page.emulate_media(color_scheme="dark")
-    expect(page.locator("[data-dsh-focus]")).to_have_attribute("data-theme", "dark")
+    expect(page.locator("[data-dsh-stage-chat]")).to_have_attribute("data-theme", "dark")
     checks.append("宿主浅色/深色/跟随系统实时切换及图表适配")
 
     page.evaluate("fixture.setFinal('# 阅读结果\\n\\n完整正文。');fixture.long(true)")
@@ -203,10 +203,10 @@ with sync_playwright() as p:
     field = page.get_by_role("textbox", name="回复规则", exact=True)
     field.fill("用户自定义阶段说明规则。")
     page.get_by_role("button", name="保存并应用", exact=True).click()
-    expect(page.locator("[data-dsh-focus-settings]")).to_contain_text("已保存并应用")
+    expect(page.locator("[data-dsh-stage-chat-settings]")).to_contain_text("已保存并应用")
     assert page.evaluate("fixture.saved().outputPrompt") == "用户自定义阶段说明规则。"
     page.evaluate("fixture.dispose()")
-    assert not page.locator("style[data-dsh-focus-styles]").count()
+    assert not page.locator("style[data-dsh-stage-chat-styles]").count()
     assert not errors, errors
     checks.append("用户自定义提示词、减少动画与卸载清理")
     browser.close()

@@ -1,12 +1,12 @@
-# dsh-focus
+# dsh-stage-chat
 
 **中文** · [English](README.en.md)
 
-dsh-focus 是 DeepSeek Harness 的阶段式对话视图。插件替换内置「对话」，将一轮回复按顺序组织为三段：执行过程、执行结果、待确认事项。
+dsh-stage-chat 是 DeepSeek Harness 的阶段式对话视图。插件替换内置「对话」，将一轮回复按顺序组织为三段：执行过程、执行结果、待确认事项。
 
 | 项目 | 说明 |
 | --- | --- |
-| 包名 | `dsh-focus` |
+| 包名 | `dsh-stage-chat` |
 | 当前版本 | 0.1.3 |
 | 兼容范围 | DeepSeek Harness 0.2.2-rc.5 及更早版本 |
 | 接入位置 | `chat`，优先级 `-100` |
@@ -29,7 +29,7 @@ dsh-focus 是 DeepSeek Harness 的阶段式对话视图。插件替换内置「�
 本机需已安装 DeepSeek Harness。
 
 ```bash
-dsh plugin --profile web add github:AlienwareBoy/dsh-chat-view
+dsh plugin --profile web add github:AlienwareBoy/dsh-stage-chat
 ```
 
 安装完成后重新加载客户端。输入区、审批及其他视图仍由 Harness 提供。配色跟随宿主的浅色、深色与系统设置。
@@ -65,5 +65,5 @@ npm pack
 上述命令不会启动 Harness。生成的安装包可在本地安装：
 
 ```bash
-dsh plugin --profile web add ./dsh-focus-0.1.3.tgz
+dsh plugin --profile web add ./dsh-stage-chat-0.1.3.tgz
 ```

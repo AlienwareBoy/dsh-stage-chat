@@ -1,5 +1,5 @@
-import defaults from "../dsh-focus-config.json";
-import defaultPrompt from "../dsh-focus-output-prompt.md";
+import defaults from "../dsh-stage-chat-config.json";
+import defaultPrompt from "../dsh-stage-chat-output-prompt.md";
 import legacy from "./legacy-design.json";
 import legacyPrompt from "./legacy-output-prompt.md";
 
@@ -19,7 +19,7 @@ export function parseDesign(text: string): Design {
   if (!object(value)) throw new Error("配置必须是 JSON 对象。");
   const d = value as unknown as Design;
   if (d.format !== defaults.format || d.version !== 2)
-    throw new Error("配置格式应为 dsh-focus-design-initializer，版本为 2。");
+    throw new Error("配置格式应为 dsh-stage-chat-design-initializer，版本为 2。");
   if (JSON.stringify(d.appearance?.layout?.order) !== JSON.stringify(defaults.appearance.layout.order))
     throw new Error("展示顺序必须为执行过程、执行结果、需要确认。");
   if (d.content?.markdown?.singleRenderer !== true ||

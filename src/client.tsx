@@ -27,7 +27,7 @@ export function apply(ctx: Context): void {
   };
   ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
     ctx.slots.inject("settings.section", () => ctx.slots.register({
-      name: "settings.section", id: "dsh-focus", order: 31, label: "对话显示",
+      name: "settings.section", id: "dsh-stage-chat", order: 31, label: "对话显示",
       inject: () => ({ hooks: { form }, form })
     }, SettingsSection))
   ));
@@ -35,11 +35,11 @@ export function apply(ctx: Context): void {
     name: "conversation.view", id: "chat", order: 0, priority: -100, label: "对话",
     inject: (sessionId): Injected => {
       const binding = ctx.sessions.binding(sessionId);
-      if (!binding) throw new Error(`dsh-focus: unknown session ${sessionId}`);
+      if (!binding) throw new Error(`dsh-stage-chat: unknown session ${sessionId}`);
       const target = ctx.uiConversation.binding(binding).target("chat");
       const source = { getSnapshot: () => {
         const value = target.getSnapshot();
-        if (!value) throw new Error("dsh-focus: Chat target unavailable");
+        if (!value) throw new Error("dsh-stage-chat: Chat target unavailable");
         return value;
       }, subscribe: target.subscribe.bind(target) };
       const sources = new Map<string, ObservableSnapshot<Turn>>();
