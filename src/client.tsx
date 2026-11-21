@@ -74,7 +74,16 @@ ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
           const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
           ctx.sidebarRight.openResource(fileAddressFor(sessionId, cwd, path));
         },
-        loadOlder: () => binding.session.loadOlder()
+        loadOlder: () => binding.session.loadOlder(),
+        forkAt: seq => {
+          const open = (ctx as Context & {
+            uiWorkspace?: { openSession?(id: string): void }
+          }).uiWorkspace?.openSession;
+          void ctx.sessions.fork({
+            sessionId, atSeq: seq, increaseTitle: true,
+            onCreated: childId => { open?.(childId); }
+          }).catch(() => { /* leave the source view unchanged */ });
+        }
       };
     }
   }, FocusView));

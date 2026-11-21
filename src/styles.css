@@ -7,7 +7,14 @@
 [data-dsh-stage-chat] button:hover{background:var(--focus-hover)}
 [data-dsh-stage-chat] button:focus-visible,[data-dsh-stage-chat] summary:focus-visible,[data-dsh-stage-chat-settings] input:focus-visible,[data-dsh-stage-chat-settings] textarea:focus-visible,[data-dsh-stage-chat-settings] button:focus-visible{outline:2px solid var(--focus-accent,#FF7500);outline-offset:3px}
 [data-dsh-stage-chat] .focus-turn{margin-bottom:32px}
-[data-dsh-stage-chat] .focus-time{font-size:11px;color:var(--focus-secondary);margin:0 0 4px 2px;user-select:none}
+[data-dsh-stage-chat] .focus-turn-placeholder{border:1px dashed var(--focus-border);border-radius:var(--focus-radius);background:transparent;opacity:.35}
+[data-dsh-stage-chat] .focus-user-row{display:flex;align-items:flex-start;justify-content:flex-end;gap:8px;margin:0 0 16px}
+[data-dsh-stage-chat] .focus-fork{position:relative;flex:0 0 auto;width:28px;height:28px;margin-top:6px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--focus-border);color:var(--focus-secondary);background:var(--focus-surface)}
+[data-dsh-stage-chat] .focus-fork:hover,[data-dsh-stage-chat] .focus-fork:focus-visible{color:var(--focus-text);background:var(--focus-hover)}
+[data-dsh-stage-chat] .focus-toast{position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);white-space:nowrap;max-width:20em;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;border-radius:6px;border:1px solid var(--focus-border);background:var(--focus-surface);color:var(--focus-text);font-size:11px;line-height:1.2;box-shadow:0 6px 18px rgba(0,0,0,.12);pointer-events:none;z-index:5}
+[data-dsh-stage-chat] .focus-user{position:relative;margin:0;width:fit-content;max-width:min(88%,100%);padding:8px 12px 18px;background:var(--focus-bubble);color:var(--focus-userText,var(--focus-text))}
+[data-dsh-stage-chat] .focus-user-body{min-width:0}
+[data-dsh-stage-chat] .focus-user-time{position:absolute;right:10px;bottom:4px;font-size:10px;line-height:1;color:var(--focus-secondary);user-select:none;pointer-events:none}
 [data-dsh-stage-chat] .focus-session-actions{display:flex;gap:8px;justify-content:flex-end;margin:0 0 12px}
 [data-dsh-stage-chat] .focus-session-actions button{font-size:12px;padding:3px 8px}
 /* Settings page: card sections, typographic scale, primary/ghost actions. */
@@ -37,7 +44,6 @@
 [data-dsh-stage-chat-settings] .focus-settings-note{margin:0;padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.6;background:var(--dsw-specific-hover,rgba(120,120,128,.1));color:var(--dsw-alias-label-secondary,inherit)}
 @media(max-width:600px){[data-dsh-stage-chat-settings] .focus-settings-colors{grid-template-columns:repeat(2,minmax(0,1fr))}[data-dsh-stage-chat-settings] select{min-width:0;width:100%}}
 [data-dsh-stage-chat] .focus-metal{position:relative;isolation:isolate;border:var(--focus-border-width) solid var(--focus-border);border-radius:var(--focus-radius);background:var(--focus-surface)}
-[data-dsh-stage-chat] .focus-user{margin:0 0 16px auto;width:fit-content;max-width:min(88%,100%);padding:8px 12px;background:var(--focus-bubble);color:var(--focus-userText,var(--focus-text))}
 [data-dsh-stage-chat] .focus-user [data-markdown-variant] p:last-child,[data-dsh-stage-chat] .focus-user [data-markdown-variant] ul:last-child{margin-bottom:0}
 [data-dsh-stage-chat] .focus-section{border:1px solid var(--focus-border);border-radius:var(--focus-radius);margin-bottom:var(--focus-gap)}
 [data-dsh-stage-chat] summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:6px var(--focus-padding);min-width:0}

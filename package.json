@@ -31,7 +31,8 @@
     "build": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
     "install:dev": "node scripts/install-dev.mjs",
-    "uninstall:dev": "node scripts/uninstall-dev.mjs"
+    "uninstall:dev": "node scripts/uninstall-dev.mjs",
+    "preview": "node scripts/preview.mjs"
   },
   "peerDependencies": {"@deepseek-ai/cordis": "~4.1.0"},
   "dependencies": {"@deepseek-ai/schemastery": "~3.19.0"},

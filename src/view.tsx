@@ -14,6 +14,8 @@ export interface Injected {
   hooks: { settings: ObservableSnapshot<Settings | undefined>; pending: ObservableSnapshot<SessionPendingInteraction | undefined> };
   keyedHooks: { turn: (key: string) => ObservableSnapshot<Turn> };
   openFile(path: string): void; loadOlder(): Promise<void>;
+  /** Host fork cut; omitted when the binding cannot branch. */
+  forkAt?(seq: number): void;
 }
 export type ViewProps = PropsRuntime<"conversation.view"> & InjectFace<Injected>;
 const labels: MarkdownLabels = { code: { copyLabel: "复制", copiedLabel: "已复制" }, footnotes: "来源" };
@@ -157,22 +159,46 @@ function StageSeat({ stage, turn, current, blocked, d }: {
     </Disclosure>}
   </Disclosure>;
 }
-function TurnSeat({ id, useTurn, d, pending, latest }:
+const FORK_TOAST = "从此前分支新对话";
+const PLACEHOLDER_HEIGHT = 360;
+const plainPreview = (text: string) =>
+  text.replace(/[#*`>\-\[\]()|_]/g, " ").replace(/\s+/g, " ").trim();
+
+function ForkButton({ onFork }: { onFork: () => void }) {
+  const [tip, setTip] = useState(false);
+  return <button type="button" className="focus-fork" aria-label={FORK_TOAST}
+    onClick={onFork} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+    onFocus={() => setTip(true)} onBlur={() => setTip(false)}>
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <path fill="currentColor" d="M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5 6v2.5A2.5 2.5 0 0 0 7.5 11H9v1a2 2 0 1 0 2 0V8.5A2.5 2.5 0 0 0 8.5 6H5Zm0 0V4"/>
+    </svg>
+    {tip && <span className="focus-toast" role="tooltip">{FORK_TOAST}</span>}
+  </button>;
+}
+
+function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
   { id: number; useTurn: ViewProps["useTurn"]; d: Design; pending?: SessionPendingInteraction; latest: boolean;
+    forkBeforeSeq: number | null; onFork?: (seq: number) => void;
   }) {
   const turn = useTurn(String(id));
   if (!turn) return null;
   const blocked = latest && !!pending;
   const current = turn.stages.find(stage => stage.id === turn.currentStageId);
   const abnormal = turn.state === "closed" && !turn.final;
-  return <article className="focus-turn" data-turn={id}>
-    {turn.startedAt && <div className="focus-time" aria-label="本轮开始时间">
-      {formatTurnTime(turn.startedAt)}
-      {turn.state === "open" && <span> · 已运行 {formatElapsed(Date.now() - turn.startedAt)}</span>}
-    </div>}
-    {turn.users.map(user => <div key={user.id} className="focus-user focus-metal">
-      <Md text={user.text} compact />
-      {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
+  const canFork = !!onFork && forkBeforeSeq !== null;
+  return <article className="focus-turn" data-turn={id} data-mounted="1">
+    {turn.users.map(user => <div key={user.id} className="focus-user-row">
+      {canFork && <ForkButton onFork={() => onFork!(forkBeforeSeq!)} />}
+      <div className="focus-user focus-metal">
+        <div className="focus-user-body">
+          <Md text={user.text} compact />
+          {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
+        </div>
+        {turn.startedAt && <div className="focus-user-time" aria-label="本轮开始时间">
+          {formatTurnTime(turn.startedAt)}
+          {turn.state === "open" && <span> · {formatElapsed(Date.now() - turn.startedAt)}</span>}
+        </div>}
+      </div>
     </div>)}
     <Disclosure id={`process-${id}`} title={`# 1. ${d.content.labels.executionProcess}`} auto
       initial={turn.state === "open" ? d.interaction.runningProcessOpen : d.interaction.processOpen}>
@@ -212,6 +238,11 @@ function TurnSeat({ id, useTurn, d, pending, latest }:
         {turn.reason && <Md text={`本轮结束状态：\`${turn.reason}\``} />}
       </section>}
   </article>;
+}
+
+function TurnPlaceholder({ id, height }: { id: number; height: number }) {
+  return <article className="focus-turn focus-turn-placeholder" data-turn={id} data-mounted="0"
+    style={{ minHeight: height }} aria-hidden="true" />;
 }
 export function themeStyle(d: Design, light: boolean): CSSProperties {
   const a = d.appearance, colors = a.themes[light ? "light" : "dark"];
@@ -256,8 +287,18 @@ function nativeLight(): boolean {
   if (theme === "dark" || document.documentElement.classList.contains("dark")) return false;
   return !matchMedia("(prefers-color-scheme: dark)").matches;
 }
+function windowAround(order: readonly number[], center: number, radius = 1): Set<number> {
+  const index = order.indexOf(center);
+  const next = new Set<number>();
+  if (index < 0) { next.add(center); return next; }
+  for (let i = Math.max(0, index - radius); i <= Math.min(order.length - 1, index + radius); i++)
+    next.add(order[i]!);
+  return next;
+}
+
 function TurnRail({ items, content, onJump }: {
-  items: readonly TurnNavigationItem[]; content: React.RefObject<HTMLDivElement>; onJump(): void;
+  items: readonly TurnNavigationItem[]; content: React.RefObject<HTMLDivElement | null>;
+  onJump(turn: number): void;
 }) {
   const rail = useRef<HTMLElement>(null), [active, setActive] = useState<number | null>(null);
   useEffect(() => {
@@ -297,23 +338,18 @@ function TurnRail({ items, content, onJump }: {
     }} onPointerLeave={() => rail.current?.querySelectorAll<HTMLElement>(".focus-anchor")
       .forEach(node => node.style.setProperty("--proximity", "0"))}>
     {items.map((item, i) => <button className="focus-anchor" key={item.turn}
-      aria-label={`第 ${i + 1} 轮：${item.prompt || "对话"}`} aria-current={active === item.turn ? "location" : undefined}
-      onClick={() => {
-        const body = content.current, target = body?.querySelector<HTMLElement>(`[data-turn="${item.turn}"]`);
-        if (!body || !target) return;
-        onJump();
-        const el = scrollParent(body);
-        el.scrollTo({ top: el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - 12,
-          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-      }}>
+      aria-label={`第 ${i + 1} 轮：${plainPreview(item.prompt) || "对话"}`}
+      aria-current={active === item.turn ? "location" : undefined}
+      onClick={() => onJump(item.turn)}>
       <span className="focus-anchor-tick" />
       <span className="focus-anchor-preview" aria-hidden="true">
-        <b>{item.prompt || "本轮对话"}</b><span>{item.response || "答复生成中…"}</span>
+        <b>{plainPreview(item.prompt) || "本轮对话"}</b>
+        <span>{plainPreview(item.response) || "答复生成中…"}</span>
       </span>
     </button>)}
   </nav>;
 }
-export function FocusView({ useSettings, usePending, useChat, useTurn, useSession, openFile, loadOlder }: ViewProps) {
+export function FocusView({ useSettings, usePending, useChat, useTurn, useSession, openFile, loadOlder, forkAt }: ViewProps) {
   const settings = useSettings(s => s), pending = usePending(p => p), d = designOf(settings);
   const chat = useChat(s => s), order = useChat(s => s.timeline.turnOrder), hasMore = useSession(s => s.hasMore),
     loadingOlder = useSession(s => s.loadingOlder), openError = useSession(s => s.openError);
@@ -328,7 +364,30 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
   };
   const [light, setLight] = useState(nativeLight), [error, setError] = useState("");
   const content = useRef<HTMLDivElement>(null), follow = useRef(true);
+  const heights = useRef(new Map<number, number>());
+  const [mounted, setMounted] = useState<Set<number>>(() => new Set());
   const navigation = useChat(s => s.navigation.items());
+  const endSeqOf = (id: number) => adaptTurn(chat, id).endSeq;
+
+  useEffect(() => {
+    if (!order.length) { setMounted(new Set()); return; }
+    setMounted(prev => {
+      if (prev.size) {
+        const next = new Set([...prev].filter(id => order.includes(id)));
+        const last = order[order.length - 1]!;
+        if (!next.has(last)) next.add(last);
+        return next.size ? next : windowAround(order, last, 1);
+      }
+      return windowAround(order, order[order.length - 1]!, 1);
+    });
+  }, [order]);
+
+  useEffect(() => {
+    const onMountAll = () => setMounted(new Set(order));
+    window.addEventListener("dsh-stage-chat-preview-mount-all", onMountAll);
+    return () => window.removeEventListener("dsh-stage-chat-preview-mount-all", onMountAll);
+  }, [order]);
+
   useEffect(() => {
     const observer = new MutationObserver(() => setLight(nativeLight()));
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
@@ -346,6 +405,31 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
     observer.observe(body);
     return () => { observer.disconnect(); el.removeEventListener("scroll", onScroll); };
   }, []);
+
+  useLayoutEffect(() => {
+    const body = content.current; if (!body) return;
+    body.querySelectorAll<HTMLElement>('.focus-turn[data-mounted="1"]').forEach(node => {
+      const id = Number(node.dataset.turn);
+      if (Number.isFinite(id)) heights.current.set(id, node.offsetHeight);
+    });
+  });
+
+  const jumpToTurn = (turn: number) => {
+    follow.current = false;
+    const body = content.current;
+    if (!body) return;
+    const el = scrollParent(body);
+    setMounted(windowAround(order, turn, 1));
+    requestAnimationFrame(() => {
+      const target = body.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
+      if (!target) return;
+      el.scrollTo({
+        top: el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - 12,
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
+      });
+    });
+  };
+
   return <ChartTheme.Provider value={light}><MarkdownDelegateProvider renderCode={renderCode} openFile={async path => openFile(path)}
     openExternalLink={url => { window.open(url, "_blank", "noopener,noreferrer"); }}>
     <div data-dsh-stage-chat data-theme={light ? "light" : "dark"} style={themeStyle(d, light)}
@@ -364,7 +448,7 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
         if (!path || /[\u0000-\u001f\u007f]/.test(path)) return;
         event.preventDefault(); event.stopPropagation(); openFile(path);
       }}>
-      <TurnRail items={navigation} content={content} onJump={() => { follow.current = false; }} />
+      <TurnRail items={navigation} content={content} onJump={jumpToTurn} />
       <div className="focus-content" ref={content}>
         {order.length > 0 && <div className="focus-session-actions">
           <CopyButton text={sessionMarkdown} label="复制会话 Markdown" />
@@ -385,8 +469,14 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
         {!order.length && <div className="focus-empty"><Md text={template(d, "emptyMessage", {
           title: d.content.labels.emptyTitle, description: d.content.labels.emptyDescription
         })} /></div>}
-        {order.map((id, i) => <TurnSeat key={id} id={id} useTurn={useTurn} d={d}
-          pending={pending} latest={i === order.length - 1} />)}
+        {order.map((id, i) => {
+          const prev = i > 0 ? order[i - 1]! : null;
+          const forkBeforeSeq = prev !== null ? endSeqOf(prev) : null;
+          if (!mounted.has(id))
+            return <TurnPlaceholder key={id} id={id} height={heights.current.get(id) ?? PLACEHOLDER_HEIGHT} />;
+          return <TurnSeat key={id} id={id} useTurn={useTurn} d={d} pending={pending}
+            latest={i === order.length - 1} forkBeforeSeq={forkBeforeSeq} onFork={forkAt} />;
+        })}
       </div>
     </div>
   </MarkdownDelegateProvider></ChartTheme.Provider>;
