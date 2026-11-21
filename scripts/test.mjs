@@ -38,7 +38,8 @@ agentsJson = JSON.stringify({ stock: "- 股票答复必须先给结论。" });
 if (section.text({}) !== composed())
   throw new Error("Without a scope every agent must see the global defaults");
 const scopeCache = createPresetScopeCache();
-schedulePresetRefresh(scopeCache, { agentPresets: registry });
+scopeCache.registry = registry;
+schedulePresetRefresh(scopeCache);
 await new Promise(resolve => setTimeout(resolve, 20));
 const sessionKey = {};
 bindScopeParent(sessionKey, stockKey);
