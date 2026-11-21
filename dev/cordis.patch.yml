@@ -1,0 +1,5 @@
+# Same fiber id as the release plugin so 对话显示 settings (agents / trocks) keep working.
+# Package name differs so you can disable github:dsh-stage-chat and enable this link.
+- insert:
+    - id: focus
+      name: dsh-stage-chat-dev

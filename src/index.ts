@@ -24,16 +24,19 @@ export const Config = z.object({
 });
 
 /**
- * Per-agent prompt delivery through the workspace directory: every prompt
- * assembly carries the live Agent (its session id), and every Session
- * announces its header — including the absolute `cwd` — when it enters the
- * store, before the first assembly. Requirements are keyed by that directory,
- * so one workspace (one directory) shares one set of hard clauses. Assemblies
- * without an Agent (diagnostics) fall back to the global defaults.
+ * Per-agent prompt delivery through the workspace directory. Prefer the live
+ * Agent's session header (`context.agent.session.header.cwd`) — that is present
+ * on every real turn assembly. The session/created cache is only a fallback for
+ * hosts that omit the live session face. Requirements are keyed by absolute
+ * cwd; assemblies without an Agent fall back to the global defaults.
  */
 interface SessionDirectoryCache {
   directories: Map<string, string | undefined>;
 }
+type AssembleAgent = {
+  id?: string;
+  session?: { header?: { cwd?: string } };
+};
 export function createSessionDirectoryCache(): SessionDirectoryCache {
   return { directories: new Map() };
 }
@@ -44,6 +47,12 @@ export function directoryOf(cache: SessionDirectoryCache, sessionId: string | un
 /** Record one session's directory as it is announced; the listener never throws. */
 export function recordSession(cache: SessionDirectoryCache, session: { id: string; header: { cwd?: string } }): void {
   cache.directories.set(session.id, session.header.cwd);
+}
+/** Resolve the workspace directory for one assembly; live session cwd wins. */
+export function workspaceDirectoryOf(agent: AssembleAgent | undefined, cache: SessionDirectoryCache): string | null {
+  const live = agent?.session?.header?.cwd;
+  if (typeof live === "string" && live) return live;
+  return directoryOf(cache, agent?.id);
 }
 
 export function apply(ctx: Context, config: Config): void {
@@ -56,9 +65,9 @@ export function apply(ctx: Context, config: Config): void {
     child.effect(() => child.systemPrompt.section({
       name: "dsh-stage-chat-output",
       order: 90,
-      text: (context: { scope?: object; agent?: { id: string } }) => {
+      text: (context: { scope?: object; agent?: AssembleAgent }) => {
         const agents = parseAgents(config.agents.get());
-        const directory = directoryOf(directoryCache, context.agent?.id);
+        const directory = workspaceDirectoryOf(context.agent, directoryCache);
         const agentRequirements = directory && agents[directory] ? agents[directory] : "";
         return composedOutputPrompt(outputPromptOf(config.outputPrompt.get()),
           config.strictStages.get(), agentRequirements);

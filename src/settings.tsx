@@ -73,7 +73,7 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
         { op: "set", path: ["strictStages"], value: strict },
         { op: "set", path: ["agents"], value: JSON.stringify(agents) }
       ], revision.current);
-      if (accepted) { setDirty(false); setNote("已保存并应用。提示词将在下一次模型请求时读取。"); }
+      if (accepted) { setDirty(false); setNote("已保存并应用。显示规则将在下一次模型请求时读取。"); }
       else setNote("宿主未接受保存。请检查配置是否可写；若另一窗口已修改，请重新载入后再保存。");
     } catch (e) { setNote(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
@@ -98,12 +98,12 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
   return <section data-dsh-stage-chat-settings>
     <p className="focus-settings-lead">
       阶段式对话：执行过程 → 执行结果 → 需要确认。仅当前运行项流光，完成后移除高光。
-      所有修改在下一次模型请求时生效，不改写其余系统提示词。
+      修改在下一次模型请求时生效。领域呈现约定请写在工作区或 Agent 的 rules 里，此处宜写路径或短说明。
     </p>
 
     <div className="focus-settings-section">
       <h4>回复规则</h4>
-      <p className="focus-settings-hint">所有 Agent 共享的默认输出格式。允许为空。</p>
+      <p className="focus-settings-hint">所有工作区共享的对话显示呈现格式。允许为空。</p>
       <textarea className="focus-settings-prose" aria-label="回复规则" value={prompt} rows={9}
         onChange={e => { setDirty(true); setPrompt(e.target.value); setNote(""); }} disabled={busy} />
     </div>
@@ -112,12 +112,16 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
       <h4>行为开关</h4>
       <label className="focus-toggle"><input type="checkbox" checked={strict}
         onChange={e => { setDirty(true); setStrict(e.target.checked); setNote(""); }} disabled={busy} />
-        严格阶段消息 — 工具调用前必须先发以阶段名称开头的公开消息</label>
+        严格阶段消息 — 工具调用前先发以阶段名称开头的公开进度，便于收入「执行过程」</label>
     </div>
 
     <div className="focus-settings-section">
-      <h4>Agent 个性化要求</h4>
-      <p className="focus-settings-hint">按工作区目录区分。列表来自当前已加载会话的工作目录；未设置的目录沿用全局默认。</p>
+      <h4>各工作区</h4>
+      <p className="focus-settings-hint">
+        按工作区目录附加说明，列表来自当前已加载会话的工作目录；未设置的目录沿用上方全局默认。
+        推荐在工作区维护 rules，有 Agent 时写进 Agent 的 rules，再在此填写规则文件路径并要求遵循。
+        若只有普通文件、没有 Agent，可让 AI 生成呈现约定后，把文案贴到此处或写入工作区 rules。
+      </p>
       <select aria-label="选择工作区" value={selected}
         onChange={e => { setSelected(e.target.value); setNote(""); }} disabled={busy}>
         <option value="">选择工作区…</option>
@@ -126,11 +130,11 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
         </option>)}
       </select>
       {selected && <>
-        <textarea aria-label={`${selected} 的个性化要求`} rows={5} spellCheck={false} className="focus-settings-prose"
-          placeholder="留空使用全局默认。图表等要求在此按需添加，例如：凡涉及走势对比的答复，必须附 mermaid 图表。"
+        <textarea aria-label={`${selected} 的工作区说明`} rows={5} spellCheck={false} className="focus-settings-prose"
+          placeholder={"留空沿用全局默认。推荐填写规则路径，例如：\n呈现约定见 docs/conversation-display.md\n或：遵循 AGENTS.md / .cursor/rules 中与对话呈现相关的条目。"}
           value={agents[selected] ?? ""}
           onChange={e => editAgents(selected, e.target.value)} disabled={busy} />
-        <p className="focus-settings-hint">仅附加到 <code>{selectedName}</code> 的会话提示词。</p>
+        <p className="focus-settings-hint">仅附加到工作区 <code>{selectedName}</code> 的对话显示段。</p>
       </>}
     </div>
 

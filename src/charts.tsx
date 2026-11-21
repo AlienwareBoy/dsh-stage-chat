@@ -8,11 +8,22 @@ let queue = Promise.resolve();
 function Mermaid({ code, streaming }: { code: string; streaming: boolean }) {
   const light = useContext(ChartTheme), id = `focus-chart-${useId().replace(/[^a-z0-9]/gi, "")}`;
   const canvas = useRef<HTMLDivElement>(null), dialog = useRef<HTMLDialogElement>(null);
+  const host = useRef<HTMLElement | null>(null);
+  const [visible, setVisible] = useState(false);
   const [svg, setSvg] = useState(""), [error, setError] = useState(""), [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = host.current; if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return;
+      setVisible(true); observer.disconnect();
+    }, { rootMargin: "120px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     let live = true;
     setError("");
-    if (streaming) return;
+    if (streaming || !visible) return;
     queue = queue.catch(() => {}).then(async () => {
       if (!live) return;
       const text = light ? "#202124" : "#e4e4e7", bg = light ? "#ffffff" : "#202022",
@@ -42,13 +53,13 @@ function Mermaid({ code, streaming }: { code: string; streaming: boolean }) {
       }
     });
     return () => { live = false; };
-  }, [code, streaming, light, id]);
-  return <figure className="focus-chart">
+  }, [code, streaming, visible, light, id]);
+  return <figure ref={node => { host.current = node; }} className="focus-chart">
     <div className="focus-chart-actions">
       <span>Mermaid</span>
       {svg && !streaming && <button onClick={() => dialog.current?.showModal()}>放大查看</button>}
     </div>
-    {streaming ? <p>图表生成中…</p> : error ? <p role="status">{error}</p> :
+    {streaming ? <p>图表生成中…</p> : !visible ? <p>图表待显示…</p> : error ? <p role="status">{error}</p> :
       <div ref={canvas} className="focus-chart-canvas" dangerouslySetInnerHTML={{ __html: svg }} />}
     <details className="focus-chart-source"><summary>源代码</summary>
       <FenceCodeBlock code={code} lang="mermaid" streaming={streaming} labels={labels} />

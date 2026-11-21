@@ -11,16 +11,16 @@ export const defaultJson = JSON.stringify(defaults, null, 2);
 export function outputPromptOf(value?: string): string {
   return value === undefined || value.trim() === legacyPrompt.trim() ? defaultPrompt : value;
 }
-/** Hard clause appended while the strict-stage toggle stays on. */
+/** Display clause appended while the strict-stage toggle stays on. */
 export const STRICT_STAGES_CLAUSE =
-  "- 阶段消息：每次调用工具前，必须先发一条以清楚阶段名称开头、说明当前动作与已确认发现的公开消息；只发工具调用而不先发阶段消息视为流程违规。";
-/** Compose the injected section: global strict clause plus this agent's own requirements. */
+  "- 阶段消息：工具调用前先发一条以清楚阶段名称开头的公开进度，便于对话显示收入「执行过程」。";
+/** Compose the injected section: shared display rules plus per-workspace notes. */
 export function composedOutputPrompt(prompt: string, strictStages?: boolean, agentRequirements?: string): string {
   const clauses = [strictStages !== false ? STRICT_STAGES_CLAUSE : "",
     agentRequirements?.trim() ?? ""].filter(Boolean);
-  return clauses.length ? `${prompt}\n\n## 4. 行为硬性要求（设置附加，按 agent 生效）\n\n${clauses.join("\n")}` : prompt;
+  return clauses.length ? `${prompt}\n\n## 4. 工作区附加说明（对话显示设置）\n\n${clauses.join("\n")}` : prompt;
 }
-/** Per-agent requirement texts stored as JSON: preset id → free-form hard clauses. */
+/** Per-workspace notes stored as JSON: absolute cwd → free-form text (often a path to rules). */
 export function parseAgents(value?: string): Record<string, string> {
   try {
     const parsed = JSON.parse(value || "{}");

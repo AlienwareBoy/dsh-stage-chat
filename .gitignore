@@ -2,3 +2,4 @@ node_modules/
 .checks/
 .DS_Store
 *.tgz
+dev/client.js

@@ -7,7 +7,7 @@ dsh-stage-chat is a stage-based conversation view for DeepSeek Harness. It repla
 | Item | Value |
 | --- | --- |
 | Package | `dsh-stage-chat` |
-| Version | 0.1.5 |
+| Version | 0.1.7 |
 | Compatibility | DeepSeek Harness 0.2.2-rc.5 and earlier |
 | Mount point | `chat`, priority `-100` |
 | License | [MIT](LICENSE) |
@@ -52,11 +52,11 @@ Mermaid fences in the result are rendered locally, with source view and zoom. Th
 
 ## Configuration
 
-Open **Conversation display** in the Harness settings. The page is organized into sections for reply rules, behavior toggles, per-agent requirements, and colors; the full configuration JSON is folded under Advanced. The reply rules take effect on the next model request and do not rewrite the rest of the system prompt. The reply rules may be empty.
+Open **Conversation display** in the Harness settings. The page is organized into sections for reply rules, behavior toggles, per-workspace notes, and colors; the full configuration JSON is folded under Advanced. Changes take effect on the next model request and may be empty.
 
-The **Strict stage messages** toggle requires a public stage-named message before every tool call, on by default.
+The **Strict stage messages** toggle asks for a public stage title before each tool call so Execution process can collect it. It is on by default.
 
-**Agent requirements** are keyed by workspace directory: hard clauses written for a directory are injected only into prompts of sessions running there, and directories left empty follow the global defaults. The directory list comes from the loaded sessions; requirements such as charts are added per directory as needed, never forced. Saves apply to that directory's next model request.
+**Per-workspace** notes are keyed by directory from the loaded sessions. Prefer keeping table/chart/structure conventions in workspace or agent rules, then put the rule path here and ask the model to follow it. Without an agent, have the AI draft the conventions and paste them here or into workspace rules. Empty directories follow the global defaults. Saves apply to that directory's next model request.
 
 ## Build from source
 
@@ -71,5 +71,5 @@ npm pack
 These commands do not start Harness. The packed archive can be installed locally:
 
 ```bash
-dsh plugin --profile web add ./dsh-stage-chat-0.1.5.tgz
+dsh plugin --profile web add ./dsh-stage-chat-0.1.7.tgz
 ```

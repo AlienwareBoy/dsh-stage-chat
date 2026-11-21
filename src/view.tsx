@@ -171,8 +171,8 @@ function TurnSeat({ id, useTurn, d, pending, latest }:
       {turn.state === "open" && <span> · 已运行 {formatElapsed(Date.now() - turn.startedAt)}</span>}
     </div>}
     {turn.users.map(user => <div key={user.id} className="focus-user focus-metal">
-      <Md text={user.text} />
-      {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} />}
+      <Md text={user.text} compact />
+      {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
     </div>)}
     <Disclosure id={`process-${id}`} title={`# 1. ${d.content.labels.executionProcess}`} auto
       initial={turn.state === "open" ? d.interaction.runningProcessOpen : d.interaction.processOpen}>
