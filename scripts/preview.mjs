@@ -84,17 +84,25 @@ body{margin:0;font:13px/1.5 system-ui,sans-serif;background:var(--dsw-alias-bg-b
   background:transparent;color:inherit;cursor:pointer}
 #preview-bar .hint{font-size:12px;color:var(--dsw-alias-label-secondary);margin-left:auto}
 #plugin-view{height:calc(100vh - 52px)}
-#native-composer{height:96px;padding:12px 16px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
-#native-composer textarea{width:100%;height:56px;resize:none;border:1px solid var(--dsw-alias-border-l1);
-  border-radius:8px;padding:8px 10px;background:var(--dsw-specific-bubble);color:inherit}
+#native-composer{display:flex;flex-direction:column;gap:8px;min-height:118px;padding:12px 16px;
+  border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+#native-composer textarea{width:100%;height:64px;resize:vertical;min-height:56px;max-height:160px;
+  border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:8px 10px;
+  background:var(--dsw-specific-bubble);color:inherit;font:inherit}
+#native-composer textarea:disabled{opacity:.7}
+#native-composer .composer-actions{display:flex;align-items:center;gap:12px}
+#native-composer .composer-hint{font-size:12px;color:var(--dsw-alias-label-secondary);margin-right:auto}
+#native-composer button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid transparent;
+  background:#ff7500;color:#fff;cursor:pointer}
+#native-composer button:disabled{opacity:.45;cursor:default}
 ${css}
 </style>
 <div id="preview-bar">
   <strong>dsh-stage-chat 预览</strong>
   <button type="button" id="btn-theme">切换深/浅色</button>
-  <button type="button" id="btn-jump">跳到第 3 轮（测虚拟加载）</button>
+  <button type="button" id="btn-jump">跳到第 2 轮</button>
   <button type="button" id="btn-mount-all">临时挂载全部轮次</button>
-  <span class="hint">左侧锚点点击 = 占位 → 滚动 → 仅挂载附近轮次 · 气泡左图标 = 从此前分支</span>
+  <span class="hint">底部可输入发送 · 会模拟执行过程与最终答复</span>
 </div>
 <div id="fixture"></div>
 <script>${js.replaceAll("</script", "<\\/script")}</script>

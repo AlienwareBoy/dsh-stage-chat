@@ -1,5 +1,5 @@
 /**
- * Browser-only preview harness. Real plugin client bundle + mocked session/chat.
+ * Browser-only preview harness. Real plugin client + mocked chat you can type into.
  * Not shipped in the Harness package.
  */
 import * as React from "react";
@@ -12,7 +12,7 @@ import plugin from "../lib/client.js?text";
 import defaults from "../dsh-stage-chat-config.json";
 import prompt from "../dsh-stage-chat-output-prompt.md";
 
-const TURN_COUNT = 18;
+const SEED_TURNS = 3;
 
 function store<T>(value: T) {
   const listeners = new Set<() => void>();
@@ -29,22 +29,36 @@ function store<T>(value: T) {
   };
 }
 
-function turnPrompt(i: number): string {
-  if (i === 3) return "看看通达信 mcp 是否正常。trocks 后端服务和前端服务是否正常";
+type TurnRec = {
+  id: number;
+  prompt: string;
+  stageText: string;
+  toolOutput: string;
+  answer: string;
+  status: "open" | "closed";
+  toolPhase: "preparing" | "start" | "done";
+  answerStatus: "none" | "running" | "settled";
+  startTime: number;
+  endTime?: number;
+  endSeq: number;
+};
+
+function seedPrompt(i: number): string {
   if (i === 1) return "需要更新，并把旧数据删掉。先判断是否冗余。缓存位置要改到塞外书生缓存目录。";
+  if (i === 2) return "看看通达信 mcp 是否正常。trocks 后端服务和前端服务是否正常";
   return `第 ${i} 轮预览：检查通达信 MCP、trocks 前后端与财务缓存。`;
 }
 
-function turnAnswer(i: number): string {
+function seedAnswer(i: number, promptText: string): string {
   return [
     `## 结论`,
     ``,
-    `第 ${i} 轮：三处服务在线，通达信 MCP 可取数。`,
+    `已收到：「${promptText.slice(0, 42)}${promptText.length > 42 ? "…" : ""}」`,
     ``,
-    `仍有两点：`,
+    `第 ${i} 轮体检：三处服务在线，通达信 MCP 可取数。`,
     ``,
     `- **财务缓存写不进家目录**`,
-    `- **本地日 K 停在 11-06，落后若干交易日**`,
+    `- **本地日 K 可继续核对**`,
     ``,
     `## 体检结果`,
     ``,
@@ -62,63 +76,90 @@ function turnAnswer(i: number): string {
   ].join("\n");
 }
 
-function makeChat() {
-  const turnOrder = Array.from({ length: TURN_COUNT }, (_, i) => i + 1);
+function createSeedTurns(): TurnRec[] {
+  const now = Date.now();
+  return Array.from({ length: SEED_TURNS }, (_, i) => {
+    const id = i + 1;
+    const promptText = seedPrompt(id);
+    return {
+      id,
+      prompt: promptText,
+      stageText: `## 收集公开资料\n\n正在核对第 ${id} 轮服务与缓存状态。`,
+      toolOutput: `第 ${id} 轮工具返回：服务正常`,
+      answer: seedAnswer(id, promptText),
+      status: "closed" as const,
+      toolPhase: "done" as const,
+      answerStatus: "settled" as const,
+      startTime: now - (SEED_TURNS - id + 1) * 3600_000,
+      endTime: now - (SEED_TURNS - id) * 3600_000 + 90_000,
+      endSeq: 1000 + id * 10
+    };
+  });
+}
+
+let turns: TurnRec[] = createSeedTurns();
+let nextSeq = 1000 + SEED_TURNS * 10 + 10;
+let busy = false;
+
+function buildChat() {
+  const turnOrder = turns.map(t => t.id);
   const nodesByTurn = new Map<number, any[]>();
   const allNodes = new Map<string, any>();
-  const now = Date.now();
-  const timings = new Map<number, { startTime: number; endTime: number }>();
+  const timings = new Map<number, { startTime: number; endTime?: number }>();
   const turnEnds = new Map<number, number>();
 
-  for (const id of turnOrder) {
-    const userKey = `user-${id}`;
-    const stageKey = `stage-${id}`;
-    const toolKey = `tool-${id}`;
-    const answerKey = `answer-${id}`;
-    const nodes = [
-      {
-        key: userKey, kind: "user",
-        data: { content: [{ type: "text", text: turnPrompt(id) }] }
-      },
-      {
-        key: stageKey, kind: "assistant-step",
+  for (const turn of turns) {
+    const nodes: any[] = [{
+      key: `user-${turn.id}`, kind: "user",
+      data: { content: [{ type: "text", text: turn.prompt }] }
+    }];
+
+    if (turn.toolPhase !== "preparing" || turn.stageText) {
+      nodes.push({
+        key: `stage-${turn.id}`, kind: "assistant-step",
         data: {
-          status: "settled",
+          status: turn.status === "open" && turn.toolPhase !== "done" ? "running" : "settled",
           blocks: [
-            {
-              kind: "text",
-              text: `## 收集公开资料\n\n正在核对第 ${id} 轮服务与缓存状态。`
-            },
-            { kind: "tool-call", callId: `c-${id}` }
+            { kind: "text", text: turn.stageText },
+            { kind: "tool-call", callId: `c-${turn.id}` }
           ]
         }
-      },
-      {
-        key: toolKey, kind: "tool-call",
-        data: {
-          root: {
-            callId: `c-${id}`, name: "check_services",
-            args: { text: (key: string) => key === "description" ? "体检" : undefined },
-            subCalls: [],
-            kind: "tool-result",
-            call: { argsRaw: JSON.stringify({ turn: id }) },
-            isError: false,
-            content: [{ type: "text", text: `第 ${id} 轮工具返回：服务正常` }]
-          }
-        }
-      },
-      {
-        key: answerKey, kind: "assistant-step",
-        data: { status: "settled", blocks: [{ kind: "text", text: turnAnswer(id) }] }
+      });
+      const toolRoot: any = {
+        callId: `c-${turn.id}`, name: "check_services",
+        args: { text: (key: string) => key === "description" ? "体检" : undefined },
+        subCalls: []
+      };
+      if (turn.toolPhase === "done") {
+        Object.assign(toolRoot, {
+          kind: "tool-result",
+          call: { argsRaw: JSON.stringify({ turn: turn.id }) },
+          isError: false,
+          content: [{ type: "text", text: turn.toolOutput }]
+        });
+      } else {
+        Object.assign(toolRoot, {
+          phase: turn.toolPhase === "start" ? "start" : "preparing",
+          argsRaw: JSON.stringify({ turn: turn.id })
+        });
       }
-    ];
-    nodesByTurn.set(id, nodes);
+      nodes.push({ key: `tool-${turn.id}`, kind: "tool-call", data: { root: toolRoot } });
+    }
+
+    if (turn.answerStatus !== "none") {
+      nodes.push({
+        key: `answer-${turn.id}`, kind: "assistant-step",
+        data: {
+          status: turn.answerStatus === "running" ? "running" : "settled",
+          blocks: [{ kind: "text", text: turn.answer }]
+        }
+      });
+    }
+
+    nodesByTurn.set(turn.id, nodes);
     nodes.forEach(n => allNodes.set(n.key, n));
-    timings.set(id, {
-      startTime: now - (TURN_COUNT - id + 1) * 3600_000,
-      endTime: now - (TURN_COUNT - id) * 3600_000 + 90_000
-    });
-    turnEnds.set(id, 1000 + id * 10);
+    timings.set(turn.id, { startTime: turn.startTime, endTime: turn.endTime });
+    if (turn.status === "closed") turnEnds.set(turn.id, turn.endSeq);
   }
 
   return {
@@ -127,12 +168,16 @@ function makeChat() {
       getTurn: (turn: number) => (nodesByTurn.get(turn) ?? []).map(n => n.key)
     },
     navigation: {
-      items: () => turnOrder.map(turn => ({
-        turn,
-        anchorKey: `user-${turn}`,
-        prompt: turnPrompt(turn),
-        response: turnAnswer(turn).replace(/[#*`|>\-\[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120)
-      }))
+      items: () => turnOrder.map(id => {
+        const turn = turns.find(t => t.id === id)!;
+        return {
+          turn: id,
+          anchorKey: `user-${id}`,
+          prompt: turn.prompt,
+          response: turn.answerStatus === "none" ? "" :
+            turn.answer.replace(/[#*`|>\-\[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120)
+        };
+      })
     },
     nodes: {
       get: (key: string) => allNodes.get(key),
@@ -140,22 +185,96 @@ function makeChat() {
     },
     timeline: {
       turnOrder,
-      turns: new Map(turnOrder.map(id => [id, {
-        status: "closed",
-        end: { seq: turnEnds.get(id), data: { reason: { kind: "completed" } } }
-      }]))
+      turns: new Map(turnOrder.map(id => {
+        const turn = turns.find(t => t.id === id)!;
+        return [id, {
+          status: turn.status,
+          end: turn.status === "closed"
+            ? { seq: turn.endSeq, data: { reason: { kind: "completed" } } }
+            : undefined
+        }];
+      }))
     },
     legacy: { turnTimings: timings, turnEnds, nodes: [], partial: null, runningCalls: [] }
   };
 }
 
-const chat = store(makeChat());
+const chat = store(buildChat());
 const pending = store(new Map());
 const session = store({ hasMore: false, loadingOlder: false });
 const formState = store({
   status: "ready", writable: true, revision: 1,
   value: { json: JSON.stringify(defaults, null, 2), outputPrompt: prompt, strictStages: true, agents: "{}" }
 });
+const composerBusy = store(false);
+
+function publish() {
+  chat.set(buildChat());
+  composerBusy.set(busy);
+}
+
+function wait(ms: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, ms));
+}
+
+async function sendMessage(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed || busy) return;
+  busy = true;
+  const id = (turns[turns.length - 1]?.id ?? 0) + 1;
+  const startTime = Date.now();
+  turns = [...turns, {
+    id,
+    prompt: trimmed,
+    stageText: "## 收集公开资料\n\n正在根据你的输入核对服务与缓存。",
+    toolOutput: "",
+    answer: "",
+    status: "open",
+    toolPhase: "preparing",
+    answerStatus: "none",
+    startTime,
+    endSeq: nextSeq
+  }];
+  publish();
+
+  await wait(350);
+  turns = turns.map(t => t.id === id ? { ...t, toolPhase: "start" } : t);
+  publish();
+
+  await wait(700);
+  turns = turns.map(t => t.id === id ? {
+    ...t,
+    toolPhase: "done",
+    toolOutput: `已处理输入（${trimmed.length} 字）：工具返回正常。`
+  } : t);
+  publish();
+
+  await wait(280);
+  const draft = [
+    `## 结论`,
+    ``,
+    `已按你的问题执行预览回合。`,
+    ``,
+    `> ${trimmed}`,
+    ``
+  ].join("\n");
+  turns = turns.map(t => t.id === id ? { ...t, answerStatus: "running", answer: draft } : t);
+  publish();
+
+  await wait(450);
+  const final = seedAnswer(id, trimmed);
+  nextSeq += 10;
+  turns = turns.map(t => t.id === id ? {
+    ...t,
+    answerStatus: "settled",
+    answer: final,
+    status: "closed",
+    endTime: Date.now(),
+    endSeq: nextSeq
+  } : t);
+  busy = false;
+  publish();
+}
 
 const form = {
   ...formState,
@@ -221,7 +340,6 @@ const ctx = {
     list: { getSnapshot: () => ({ byId: { preview: { cwd: "/tmp/preview" } } }) },
     fork: async (opts: { sessionId: string; atSeq?: number }) => {
       (window as any).__lastFork = opts;
-      console.info("[preview] fork", opts);
       return `preview-fork-${opts.atSeq ?? "latest"}`;
     }
   },
@@ -253,6 +371,37 @@ const props = {
   forkAt: injected.forkAt
 };
 
+function Composer() {
+  const [text, setText] = React.useState("");
+  const running = sourceHook(composerBusy)();
+  const send = async () => {
+    const value = text;
+    setText("");
+    await sendMessage(value);
+  };
+  return <div id="native-composer">
+    <textarea
+      aria-label="发送消息"
+      placeholder={running ? "本轮预览执行中…" : "输入消息后发送，查看气泡 / 执行过程 / 结果"}
+      value={text}
+      disabled={running}
+      onChange={e => setText(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          void send();
+        }
+      }}
+    />
+    <div className="composer-actions">
+      <span className="composer-hint">Enter 发送 · Shift+Enter 换行 · 预览会模拟工具与最终答复</span>
+      <button type="button" disabled={running || !text.trim()} onClick={() => void send()}>
+        {running ? "执行中…" : "发送"}
+      </button>
+    </div>
+  </div>;
+}
+
 const root = createRoot(document.getElementById("fixture")!);
 root.render(
   <div id="plugin-view" className={nativeCss.root} data-phase="active">
@@ -262,9 +411,7 @@ root.render(
           <view.component {...props} />
         </div>
         <div className={nativeCss.composerSeat}>
-          <div id="native-composer">
-            <textarea aria-label="发送消息" placeholder="预览输入区（不发送）" readOnly />
-          </div>
+          <Composer />
         </div>
       </div>
     </div>
@@ -281,7 +428,8 @@ root.render(
   theme(dark: boolean) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
-  }
+  },
+  send: sendMessage
 };
 
 document.getElementById("btn-theme")?.addEventListener("click", () => {
@@ -289,7 +437,7 @@ document.getElementById("btn-theme")?.addEventListener("click", () => {
   (window as any).preview.theme(dark);
 });
 document.getElementById("btn-jump")?.addEventListener("click", () => {
-  (window as any).preview.jump(3);
+  (window as any).preview.jump(2);
 });
 document.getElementById("btn-mount-all")?.addEventListener("click", () => {
   (window as any).preview.mountAll();
