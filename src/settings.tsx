@@ -11,6 +11,8 @@ export interface SettingsInjected {
 export type SettingsProps = PropsRuntime<"settings.section"> & InjectFace<SettingsInjected>;
 const colors = [
   ["交互强调色", "accent"],
+  ["用户气泡文字 · 浅色", "themes.light.userText"],
+  ["用户气泡文字 · 深色", "themes.dark.userText"],
   ["完成勾 · 深色", "statusColors.completed.dark"],
   ["完成勾 · 浅色", "statusColors.completed.light"],
   ["失败标记", "statusColors.failed"],

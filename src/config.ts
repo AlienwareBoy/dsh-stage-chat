@@ -54,6 +54,16 @@ export function parseDesign(text: string): Design {
     throw new Error("状态色与强调色必须是 #RRGGBB。");
   const cssColor = (s: unknown) => typeof s === "string" &&
     (/^#[\da-f]{3,8}$/i.test(s) || /^rgba?\([\d\s.,%]+\)$/i.test(s));
+  // Fill newly introduced theme keys so older saved JSON keeps working.
+  for (const theme of ["light", "dark"] as const) {
+    const themeColors = a.themes?.[theme];
+    if (!object(themeColors)) throw new Error(`主题 ${theme} 缺少颜色表。`);
+    for (const key of Object.keys(defaults.appearance.themes[theme]) as
+        (keyof typeof defaults.appearance.themes.light)[]) {
+      if (!cssColor(themeColors[key]))
+        (themeColors as Record<string, string>)[key] = defaults.appearance.themes[theme][key];
+    }
+  }
   for (const theme of ["light", "dark"] as const)
     for (const key of Object.keys(defaults.appearance.themes[theme]))
       if (!cssColor(a.themes?.[theme]?.[key as keyof typeof a.themes.light]))
