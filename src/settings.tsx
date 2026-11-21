@@ -18,16 +18,31 @@ export function download(text: string, name: string, type = "application/json") 
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+/** Clipboard with a hidden-textarea fallback for non-focusable webviews. */
+export async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    try {
+      const area = document.createElement("textarea");
+      area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+      document.body.append(area); area.select();
+      const done = document.execCommand("copy"); area.remove(); return done;
+    } catch { return false; }
+  }
+}
 
 export function SettingsSection({ useForm, form }: SettingsProps & { form: ConfigForm<Settings> }) {
   const snapshot = useForm(s => s) as ConfigFormSnapshot<Settings>;
   const [json, setJson] = useState(defaultJson), [prompt, setPrompt] = useState(defaultPrompt);
+  const [strict, setStrict] = useState(true), [charts, setCharts] = useState(true);
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [note, setNote] = useState("");
   const revision = useRef<number>();
   useEffect(() => {
     if (dirty) return;
     setJson(snapshot.value?.json ?? defaultJson);
     setPrompt(outputPromptOf(snapshot.value?.outputPrompt));
+    setStrict(snapshot.value?.strictStages ?? true);
+    setCharts(snapshot.value?.requiredCharts ?? true);
     revision.current = snapshot.revision;
   }, [snapshot.value, snapshot.revision, dirty]);
   const editJson = (value: string) => { setDirty(true); setJson(value); setNote(""); };
@@ -37,7 +52,9 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
       parseDesign(json); setBusy(true);
       const accepted = await form.mutate([
         { op: "set", path: ["json"], value: json },
-        { op: "set", path: ["outputPrompt"], value: prompt }
+        { op: "set", path: ["outputPrompt"], value: prompt },
+        { op: "set", path: ["strictStages"], value: strict },
+        { op: "set", path: ["requiredCharts"], value: charts }
       ], revision.current);
       if (accepted) { setDirty(false); setNote("已保存并应用。提示词将在下一次模型请求时读取。"); }
       else setNote("宿主未接受保存。请检查配置是否可写；若另一窗口已修改，请重新载入后再保存。");
@@ -70,17 +87,28 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
       onChange={e => editJson(e.target.value)} disabled={busy} /></label>
     <label>回复规则<textarea aria-label="回复规则" value={prompt} rows={9}
       onChange={e => { setDirty(true); setPrompt(e.target.value); setNote(""); }} disabled={busy} /></label>
+    <p>以下开关在回复规则之外附加硬性条款，与回复规则一同在下一次模型请求时生效。</p>
+    <label className="focus-toggle"><input type="checkbox" checked={strict}
+      onChange={e => { setDirty(true); setStrict(e.target.checked); setNote(""); }} disabled={busy} />
+      严格阶段消息：工具调用前必须先发以阶段名称开头的公开消息</label>
+    <label className="focus-toggle"><input type="checkbox" checked={charts}
+      onChange={e => { setDirty(true); setCharts(e.target.checked); setNote(""); }} disabled={busy} />
+      必须图表：走势、对比、流程类答复必须附 mermaid 图表</label>
     <p>配色和文案可改。任务状态由真实宿主事件决定；开发提示词不注入运行会话。</p>
     <div className="focus-actions">
       <button disabled={disabled} onClick={save}>{busy ? "保存中…" : "保存并应用"}</button>
-      <button disabled={busy} onClick={() => { setDirty(true); setJson(defaultJson); setPrompt(defaultPrompt); setNote("已恢复默认草稿，请保存并应用。"); }}>恢复默认</button>
+      <button disabled={busy} onClick={() => { setDirty(true); setJson(defaultJson); setPrompt(defaultPrompt);
+        setStrict(true); setCharts(true); setNote("已恢复默认草稿，请保存并应用。"); }}>恢复默认</button>
       <button disabled={busy} onClick={() => {
         setDirty(false); setNote(""); setJson(snapshot.value?.json ?? defaultJson);
-        setPrompt(outputPromptOf(snapshot.value?.outputPrompt)); revision.current = snapshot.revision;
+        setPrompt(outputPromptOf(snapshot.value?.outputPrompt));
+        setStrict(snapshot.value?.strictStages ?? true); setCharts(snapshot.value?.requiredCharts ?? true);
+        revision.current = snapshot.revision;
       }}>重新载入</button>
       <button onClick={() => {
-        try { download(JSON.stringify({ format: "dsh-stage-chat-plugin-settings", version: 1,
-          configuration: parseDesign(json), outputPrompt: prompt }, null, 2), "dsh-stage-chat-plugin-settings.json"); }
+        try { download(JSON.stringify({ format: "dsh-stage-chat-plugin-settings", version: 2,
+          configuration: parseDesign(json), outputPrompt: prompt,
+          strictStages: strict, requiredCharts: charts }, null, 2), "dsh-stage-chat-plugin-settings.json"); }
         catch (e) { setNote(String(e)); }
       }}>导出设置 JSON</button>
     </div>

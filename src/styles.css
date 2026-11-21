@@ -7,6 +7,11 @@
 [data-dsh-stage-chat] button:hover{background:var(--focus-hover)}
 [data-dsh-stage-chat] button:focus-visible,[data-dsh-stage-chat] summary:focus-visible,[data-dsh-stage-chat-settings] input:focus-visible,[data-dsh-stage-chat-settings] textarea:focus-visible,[data-dsh-stage-chat-settings] button:focus-visible{outline:2px solid var(--focus-accent,#FF7500);outline-offset:3px}
 [data-dsh-stage-chat] .focus-turn{margin-bottom:32px}
+[data-dsh-stage-chat] .focus-time{font-size:11px;color:var(--focus-secondary);margin:0 0 4px 2px;user-select:none}
+[data-dsh-stage-chat] .focus-session-actions{display:flex;gap:8px;justify-content:flex-end;margin:0 0 12px}
+[data-dsh-stage-chat] .focus-session-actions button{font-size:12px;padding:3px 8px}
+[data-dsh-stage-chat-settings] .focus-toggle{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;cursor:pointer}
+[data-dsh-stage-chat-settings] .focus-toggle input{width:auto;margin:0}
 [data-dsh-stage-chat] .focus-metal{position:relative;isolation:isolate;border:var(--focus-border-width) solid var(--focus-border);border-radius:var(--focus-radius);background:var(--focus-surface)}
 [data-dsh-stage-chat] .focus-user{margin:0 0 16px auto;max-width:88%;padding:8px 12px;background:var(--focus-bubble)}
 [data-dsh-stage-chat] .focus-section{border:1px solid var(--focus-border);border-radius:var(--focus-radius);margin-bottom:var(--focus-gap)}

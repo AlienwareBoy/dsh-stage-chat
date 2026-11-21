@@ -6,8 +6,8 @@ import type { PropsRuntime, InjectFace } from "@deepseek-ai/dsh-client-ui-slots"
 import type { ObservableSnapshot } from "@deepseek-ai/dsh-client-store";
 import type { SessionPendingInteraction } from "@deepseek-ai/dsh-client-ui-session/client";
 import { defaultDesign, designOf, template, type Design, type Settings } from "./config";
-import { fence, type Item, type Turn, type Stage } from "./adapter";
-import { download } from "./settings";
+import { fence, adaptTurn, type Item, type Turn, type Stage } from "./adapter";
+import { download, copyText } from "./settings";
 import { ChartTheme, renderCode } from "./charts";
 
 export interface Injected {
@@ -23,6 +23,62 @@ export function Md({ text, compact = false, streaming = false }: { text: string;
 const stateText: Record<Item["state"], string> = {
   queued: "等待执行", running: "执行中", succeeded: "已完成", failed: "执行失败", interrupted: "已中断"
 };
+const pad = (n: number) => String(n).padStart(2, "0");
+/** Today HH:mm; yesterday prefixed; past week day-level; older full timestamp. */
+function formatTurnTime(at: number): string {
+  const date = new Date(at), now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const hm = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (at >= startOfToday) return hm;
+  if (at >= startOfToday - 86400000) return `昨天 ${hm}`;
+  if (now.getTime() - at < 7 * 86400000) return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${hm}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  return minutes < 60 ? `${minutes}m${total % 60}s` : `${Math.floor(minutes / 60)}h${minutes % 60}m`;
+}
+/** Copy button with transient success feedback; keeps table labels stable otherwise. */
+function CopyButton({ text, label }: { text: () => string; label: string }) {
+  const [done, setDone] = useState<"idle" | "ok" | "fail">("idle");
+  return <button onClick={async () => {
+    setDone(await copyText(text()) ? "ok" : "fail");
+    setTimeout(() => setDone("idle"), 1800);
+  }}>{done === "ok" ? "已复制" : done === "fail" ? "复制失败" : label}</button>;
+}
+const plain = (text: string) => text.replace(/[*#`]/g, "");
+/** Honest full-turn Markdown: only sections the host evidence actually shows. */
+function turnMarkdown(turn: Turn): string {
+  const lines: string[] = [`## 第 ${turn.id} 轮${turn.startedAt ? ` · ${formatTurnTime(turn.startedAt)}` : ""}`, ""];
+  const question = turn.users.map(user => [user.text,
+    ...user.files.map(name => `附件：${name}`)].filter(Boolean).join("\n")).join("\n\n");
+  if (question) lines.push("### 提问", "", question, "");
+  const process = turn.stages.filter(stage => stage.id !== `final-${turn.id}`);
+  if (process.length) {
+    lines.push("### 执行过程", "");
+    for (const stage of process) {
+      lines.push(`- 阶段：${plain(stage.title)} — ${stateText[stage.state]}`);
+      if (stage.text) lines.push("", stage.text.trim(), "");
+      for (const item of stage.items) lines.push(`  - 工具：${plain(item.title)}（${item.name}）— ${stateText[item.state]}`);
+    }
+    lines.push("");
+  }
+  if (turn.final || turn.partial) {
+    lines.push("### 执行结果", "", (turn.final || turn.partial).trim(), "");
+    if (!turn.final && turn.partial) lines.push("> 本轮尚未产出完整最终答复，以上为已返回的正文片段。", "");
+  } else if (turn.state === "closed") lines.push("### 执行结果", "", "> 本轮已结束，未取得完整最终答复。", "");
+  if (turn.confirmation || turn.errors.length) {
+    lines.push("### 需要确认", "");
+    if (turn.confirmation) lines.push(turn.confirmation.trim(), "");
+    turn.errors.forEach(error => lines.push(`- 错误：${error}`));
+    if (turn.reason) lines.push(`- 本轮结束状态：${turn.reason}`);
+    lines.push("");
+  }
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
 function Mark({ state }: { state: Item["state"] }) {
   return <span className="focus-mark" data-state={state} aria-hidden="true">
     {state === "succeeded" ? "✓" : state === "failed" ? "×" : state === "running" ? "◌" : "·"}
@@ -110,6 +166,10 @@ function TurnSeat({ id, useTurn, d, pending, latest }:
   const current = turn.stages.find(stage => stage.id === turn.currentStageId);
   const abnormal = turn.state === "closed" && !turn.final;
   return <article className="focus-turn" data-turn={id}>
+    {turn.startedAt && <div className="focus-time" aria-label="本轮开始时间">
+      {formatTurnTime(turn.startedAt)}
+      {turn.state === "open" && <span> · 已运行 {formatElapsed(Date.now() - turn.startedAt)}</span>}
+    </div>}
     {turn.users.map(user => <div key={user.id} className="focus-user focus-metal">
       <Md text={user.text} />
       {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} />}
@@ -130,15 +190,16 @@ function TurnSeat({ id, useTurn, d, pending, latest }:
       {turn.final ? <>
         <Md text={turn.result || "本轮答复未提供结果正文。"} />
         <div className="focus-actions">
+          <CopyButton text={() => turn.final} label="复制本轮 Markdown" />
           <button onClick={() => download(turn.final, `dsh-result-${id}.md`, "text/markdown")}>下载完整 Markdown</button>
         </div>
-      </> : <div className="focus-waiting">
-        <Md text={blocked ? "> 等待你处理请求，运行流光已停止。" :
-          abnormal ? "> 本轮已结束，未取得完整最终答复。" : "> 流程运行中，请等待。最终答复尚未生成。"} />
+      </> : (blocked || abnormal || turn.partial) ? <div className="focus-waiting">
+        {(blocked || abnormal) && <Md text={blocked ? "> 等待你处理请求，运行流光已停止。" :
+          "> 本轮已结束，未取得完整最终答复。" } />}
         {turn.partial && <Disclosure id={`partial-${id}`} title="**已返回的正文片段（尚未完成）**">
           <Md text={turn.partial} streaming={turn.state === "open"} />
         </Disclosure>}
-      </div>}
+      </div> : null}
     </section>
     {(blocked || turn.confirmation || turn.errors.length > 0 || ["aborted", "interrupted", "blocked"].includes(turn.reason ?? "")) &&
       <section className="focus-pending focus-metal">
@@ -254,8 +315,17 @@ function TurnRail({ items, content, onJump }: {
 }
 export function FocusView({ useSettings, usePending, useChat, useTurn, useSession, openFile, loadOlder }: ViewProps) {
   const settings = useSettings(s => s), pending = usePending(p => p), d = designOf(settings);
-  const order = useChat(s => s.timeline.turnOrder), hasMore = useSession(s => s.hasMore),
+  const chat = useChat(s => s), order = useChat(s => s.timeline.turnOrder), hasMore = useSession(s => s.hasMore),
     loadingOlder = useSession(s => s.loadingOlder), openError = useSession(s => s.openError);
+  const sessionMarkdown = () => {
+    const now = new Date();
+    const turns = order.map(id => adaptTurn(chat, id))
+      .filter(turn => turn.users.length || turn.stages.length > 1 || turn.final || turn.partial);
+    return [`# 会话 Markdown 记录`, "",
+      `导出于 ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+        `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}，共 ${turns.length} 轮。`, "",
+      turns.map(turnMarkdown).join("\n\n---\n\n")].join("\n");
+  };
   const [light, setLight] = useState(nativeLight), [error, setError] = useState("");
   const content = useRef<HTMLDivElement>(null), follow = useRef(true);
   const navigation = useChat(s => s.navigation.items());
@@ -296,6 +366,15 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
       }}>
       <TurnRail items={navigation} content={content} onJump={() => { follow.current = false; }} />
       <div className="focus-content" ref={content}>
+        {order.length > 0 && <div className="focus-session-actions">
+          <CopyButton text={sessionMarkdown} label="复制会话 Markdown" />
+          <button onClick={() => {
+            const now = new Date();
+            download(sessionMarkdown(),
+              `dsh-session-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.md`,
+              "text/markdown");
+          }}>下载会话 Markdown</button>
+        </div>}
         {hasMore && <button disabled={loadingOlder} onClick={async () => {
           const el = content.current ? scrollParent(content.current) : null, old = el ? el.scrollHeight - el.scrollTop : 0;
           follow.current = false;

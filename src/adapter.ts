@@ -18,6 +18,7 @@ export interface Turn {
   generating: boolean; focusId: string | null;
   result: string; reportedProcess: string; confirmation: string;
   stages: Stage[]; currentStageId: string | null;
+  startedAt: number | null;
 }
 function stageTitle(text: string): string {
   return text.split("\n").map(line => line.trim()).find(Boolean)
@@ -146,7 +147,9 @@ export function adaptTurn(chat: ChatSnapshot, id: number): Turn {
     [...stages].reverse().find(s => s.state === "running")?.id ??
     [...stages].reverse().find(s => s.id !== `final-${id}`)?.id ?? `final-${id}` : null;
   return { id, users, items, progress, final, partial, state, reason, errors, ...splitAnswer(final),
-    generating: isGenerating, focusId, stages, currentStageId };
+    generating: isGenerating, focusId, stages, currentStageId,
+    // Hosts older than rc.5 may not publish legacy timings; absence means no time label.
+    startedAt: chat.legacy?.turnTimings?.get(id)?.startTime ?? null };
 }
 
 /** Per-turn subscriptions include in-place tool-argument changes and turn/end updates. */
