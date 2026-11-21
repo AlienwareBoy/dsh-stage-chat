@@ -187,18 +187,18 @@ function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
   const abnormal = turn.state === "closed" && !turn.final;
   const canFork = !!onFork && forkBeforeSeq !== null;
   return <article className="focus-turn" data-turn={id} data-mounted="1">
-    {turn.users.map(user => <div key={user.id} className="focus-user-row">
-      {canFork && <ForkButton onFork={() => onFork!(forkBeforeSeq!)} />}
-      <div className="focus-user focus-metal">
-        <div className="focus-user-body">
+    {turn.users.map(user => <div key={user.id} className="focus-user-block">
+      <div className="focus-user-row">
+        {canFork && <ForkButton onFork={() => onFork!(forkBeforeSeq!)} />}
+        <div className="focus-user focus-metal">
           <Md text={user.text} compact />
           {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
         </div>
-        {turn.startedAt && <div className="focus-user-time" aria-label="本轮开始时间">
-          {formatTurnTime(turn.startedAt)}
-          {turn.state === "open" && <span> · {formatElapsed(Date.now() - turn.startedAt)}</span>}
-        </div>}
       </div>
+      {turn.startedAt && <div className="focus-user-tips" aria-label="本轮开始时间">
+        {formatTurnTime(turn.startedAt)}
+        {turn.state === "open" && <span> · {formatElapsed(Date.now() - turn.startedAt)}</span>}
+      </div>}
     </div>)}
     <Disclosure id={`process-${id}`} title={`# 1. ${d.content.labels.executionProcess}`} auto
       initial={turn.state === "open" ? d.interaction.runningProcessOpen : d.interaction.processOpen}>
@@ -399,12 +399,63 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
   useEffect(() => {
     const body = content.current; if (!body) return;
     const el = scrollParent(body);
-    const onScroll = () => { follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; };
+    let raf = 0, pruneTimer = 0;
+
+    const idsNearViewport = (padRatio = 1) => {
+      const box = el.getBoundingClientRect();
+      const pad = box.height * padRatio;
+      const ids: number[] = [];
+      body.querySelectorAll<HTMLElement>("[data-turn]").forEach(node => {
+        const rect = node.getBoundingClientRect();
+        const id = Number(node.dataset.turn);
+        if (!Number.isFinite(id)) return;
+        if (rect.bottom >= box.top - pad && rect.top <= box.bottom + pad) ids.push(id);
+      });
+      return ids;
+    };
+
+    const expandVisible = () => {
+      const visible = idsNearViewport(1.25);
+      if (!visible.length) return;
+      setMounted(prev => {
+        const next = new Set(prev);
+        for (const id of visible) windowAround(order, id, 1).forEach(x => next.add(x));
+        if (order.length) next.add(order[order.length - 1]!);
+        return next;
+      });
+    };
+
+    const pruneFar = () => {
+      const keep = new Set<number>();
+      for (const id of idsNearViewport(1.5)) windowAround(order, id, 1).forEach(x => keep.add(x));
+      if (order.length) keep.add(order[order.length - 1]!);
+      setMounted(prev => {
+        let changed = prev.size !== keep.size;
+        if (!changed) for (const id of prev) if (!keep.has(id)) { changed = true; break; }
+        return changed ? keep : prev;
+      });
+    };
+
+    const onScroll = () => {
+      follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      // Throttle expand: at most once per frame while scrolling.
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; expandVisible(); });
+      // Debounce prune: wait until scrolling settles.
+      clearTimeout(pruneTimer);
+      pruneTimer = window.setTimeout(pruneFar, 160);
+    };
+
     el.addEventListener("scroll", onScroll, { passive: true });
+    expandVisible();
     const observer = new ResizeObserver(() => { if (follow.current) el.scrollTop = el.scrollHeight; });
     observer.observe(body);
-    return () => { observer.disconnect(); el.removeEventListener("scroll", onScroll); };
-  }, []);
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      clearTimeout(pruneTimer);
+    };
+  }, [order]);
 
   useLayoutEffect(() => {
     const body = content.current; if (!body) return;
@@ -420,14 +471,15 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
     if (!body) return;
     const el = scrollParent(body);
     setMounted(windowAround(order, turn, 1));
-    requestAnimationFrame(() => {
+    // Wait for placeholder → mounted paint, then scroll.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const target = body.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
       if (!target) return;
       el.scrollTo({
         top: el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - 12,
         behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
       });
-    });
+    }));
   };
 
   return <ChartTheme.Provider value={light}><MarkdownDelegateProvider renderCode={renderCode} openFile={async path => openFile(path)}
