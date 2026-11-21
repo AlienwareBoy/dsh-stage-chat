@@ -5,7 +5,7 @@ import { defaultJson, defaultPrompt, designOf, parseDesign, parseAgents, outputP
 
 export interface SettingsInjected {
   hooks: { form: ConfigForm<Settings> };
-  /** Agent roster for the per-agent requirements dropdown. */
+  /** Distinct workspace directories of the loaded sessions. */
   roster: () => Promise<{ id: string; name?: string; description?: string }[]>;
 }
 export type SettingsProps = PropsRuntime<"settings.section"> & InjectFace<SettingsInjected>;
@@ -94,36 +94,64 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
     return String(obj[keys.at(-1)!]);
   };
   const disabled = busy || snapshot.status !== "ready" || !snapshot.writable;
+  const selectedName = rosterItems.find(item => item.id === selected)?.name || selected;
   return <section data-dsh-stage-chat-settings>
-    <p>执行过程 → 执行结果 → 需要确认。仅当前运行项流光，完成后移除高光。</p>
-    <div className="focus-settings-colors">{colors.map(([label, path]) =>
-      <label key={path}>{label}<input type="color" value={color(path)} disabled={disabled}
-        onChange={e => { try { color(path, e.target.value); } catch (err) { setNote(String(err)); } }} /></label>
-    )}</div>
-    <label>配置 JSON<textarea aria-label="配置 JSON" value={json} rows={12} spellCheck={false}
-      onChange={e => editJson(e.target.value)} disabled={busy} /></label>
-    <label>回复规则<textarea aria-label="回复规则" value={prompt} rows={9}
-      onChange={e => { setDirty(true); setPrompt(e.target.value); setNote(""); }} disabled={busy} /></label>
-    <p>以下开关与个性化要求在回复规则之外附加硬性条款，一同在下一次模型请求时生效。</p>
-    <label className="focus-toggle"><input type="checkbox" checked={strict}
-      onChange={e => { setDirty(true); setStrict(e.target.checked); setNote(""); }} disabled={busy} />
-      严格阶段消息：工具调用前必须先发以阶段名称开头的公开消息</label>
-    <label>Agent 个性化要求<select aria-label="选择 Agent" value={selected}
+    <p className="focus-settings-lead">
+      阶段式对话：执行过程 → 执行结果 → 需要确认。仅当前运行项流光，完成后移除高光。
+      所有修改在下一次模型请求时生效，不改写其余系统提示词。
+    </p>
+
+    <div className="focus-settings-section">
+      <h4>回复规则</h4>
+      <p className="focus-settings-hint">所有 Agent 共享的默认输出格式。允许为空。</p>
+      <textarea className="focus-settings-prose" aria-label="回复规则" value={prompt} rows={9}
+        onChange={e => { setDirty(true); setPrompt(e.target.value); setNote(""); }} disabled={busy} />
+    </div>
+
+    <div className="focus-settings-section">
+      <h4>行为开关</h4>
+      <label className="focus-toggle"><input type="checkbox" checked={strict}
+        onChange={e => { setDirty(true); setStrict(e.target.checked); setNote(""); }} disabled={busy} />
+        严格阶段消息 — 工具调用前必须先发以阶段名称开头的公开消息</label>
+    </div>
+
+    <div className="focus-settings-section">
+      <h4>Agent 个性化要求</h4>
+      <p className="focus-settings-hint">按工作区目录区分。列表来自当前已加载会话的工作目录；未设置的目录沿用全局默认。</p>
+      <select aria-label="选择工作区" value={selected}
         onChange={e => { setSelected(e.target.value); setNote(""); }} disabled={busy}>
-        <option value="">选择 Agent…</option>
-        {rosterItems.map(item => <option key={item.id} value={item.id}>
+        <option value="">选择工作区…</option>
+        {rosterItems.map(item => <option key={item.id} value={item.id} title={item.id}>
           {item.name || item.id}{agents[item.id] ? "（已设置）" : ""}
         </option>)}
-      </select></label>
-    {selected && <>
-      <textarea aria-label={`${selected} 的个性化要求`} rows={5} placeholder="留空使用上方默认。图表等要求在此按需添加，例如：凡涉及走势对比的答复，必须附 mermaid 图表。"
-        value={agents[selected] ?? ""} spellCheck={false}
-        onChange={e => editAgents(selected, e.target.value)} disabled={busy} />
-      <p>该要求只附加到 {rosterItems.find(item => item.id === selected)?.name || selected} 的提示词；留空则完全沿用默认。保存后下一次该 Agent 的请求生效。</p>
-    </>}
-    <p>配色和文案可改。任务状态由真实宿主事件决定；开发提示词不注入运行会话。</p>
-    <div className="focus-actions">
-      <button disabled={disabled} onClick={save}>{busy ? "保存中…" : "保存并应用"}</button>
+      </select>
+      {selected && <>
+        <textarea aria-label={`${selected} 的个性化要求`} rows={5} spellCheck={false} className="focus-settings-prose"
+          placeholder="留空使用全局默认。图表等要求在此按需添加，例如：凡涉及走势对比的答复，必须附 mermaid 图表。"
+          value={agents[selected] ?? ""}
+          onChange={e => editAgents(selected, e.target.value)} disabled={busy} />
+        <p className="focus-settings-hint">仅附加到 <code>{selectedName}</code> 的会话提示词。</p>
+      </>}
+    </div>
+
+    <div className="focus-settings-section">
+      <h4>配色</h4>
+      <div className="focus-settings-colors">{colors.map(([label, path]) =>
+        <label key={path} title={path}>{label}<input type="color" value={color(path)} disabled={disabled}
+          onChange={e => { try { color(path, e.target.value); } catch (err) { setNote(String(err)); } }} /></label>
+      )}</div>
+    </div>
+
+    <details className="focus-settings-advanced">
+      <summary>高级 · 配置 JSON</summary>
+      <p className="focus-settings-hint">完整设计配置。修改后仍需保存并应用。</p>
+      <textarea className="focus-settings-code" aria-label="配置 JSON" value={json} rows={12} spellCheck={false}
+        onChange={e => editJson(e.target.value)} disabled={busy} />
+    </details>
+
+    <div className="focus-settings-actions">
+      <button className="focus-settings-primary" disabled={disabled} onClick={save}>
+        {busy ? "保存中…" : "保存并应用"}</button>
       <button disabled={busy} onClick={() => { setDirty(true); setJson(defaultJson); setPrompt(defaultPrompt);
         setStrict(true); setAgents({}); setNote("已恢复默认草稿，请保存并应用。"); }}>恢复默认</button>
       <button disabled={busy} onClick={() => {
@@ -139,8 +167,9 @@ export function SettingsSection({ useForm, form, roster }: SettingsProps & { for
         catch (e) { setNote(String(e)); }
       }}>导出设置 JSON</button>
     </div>
-    {snapshot.status !== "ready" && <p role="status">正在等待宿主配置；请确认插件已安装到当前 profile。</p>}
-    {snapshot.status === "ready" && !snapshot.writable && <p>当前配置不可写。通过临时 patch 加载的配置可能只读。</p>}
-    {note && <p role="status">{note}</p>}
+
+    {snapshot.status !== "ready" && <p className="focus-settings-note" role="status">正在等待宿主配置；请确认插件已安装到当前 profile。</p>}
+    {snapshot.status === "ready" && !snapshot.writable && <p className="focus-settings-note">当前配置不可写。通过临时 patch 加载的配置可能只读。</p>}
+    {note && <p className="focus-settings-note" role="status">{note}</p>}
   </section>;
 }

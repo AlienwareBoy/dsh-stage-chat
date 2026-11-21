@@ -25,28 +25,21 @@ const form = ctx.configForms.get<Settings>(NAMESPACE);
 const settings: ObservableSnapshot<Settings | undefined> = {
   getSnapshot: () => form.getSnapshot().value, subscribe: listener => form.subscribe(listener)
 };
-/** Agent roster for the per-agent requirements dropdown; degrades to in-use presets. */
+/** Agent roster = distinct workspace directories of the loaded sessions. */
 const roster = async (): Promise<{ id: string; name?: string; description?: string }[]> => {
-  const out: { id: string; name?: string; description?: string }[] = [];
-  try {
-    const presets = (ctx as unknown as { agentPresets?: { remoteExportList?: () => Promise<{
-      presets?: { id: string; name?: string; description?: string }[] }> } }).agentPresets;
-    if (presets?.remoteExportList) {
-      const rosterData = await presets.remoteExportList();
-      for (const preset of rosterData?.presets ?? []) out.push(preset);
-      if (out.length) return out;
-    }
-  } catch { /* fall through to session-derived presets */ }
   try {
     const byId = (ctx.sessions.list.getSnapshot() as { byId?: Record<string, {
-      projectionValues?: { agentPreset?: string | null } }> }).byId ?? {};
-    const seen = new Set<string>();
+      cwd?: string | null }> }).byId ?? {};
+    const seen = new Map<string, string>();
     for (const session of Object.values(byId)) {
-      const id = session.projectionValues?.agentPreset;
-      if (typeof id === "string" && id && !seen.has(id)) { seen.add(id); out.push({ id }); }
+      const cwd = session?.cwd;
+      if (typeof cwd === "string" && cwd && !seen.has(cwd)) {
+        seen.set(cwd, cwd.split("/").filter(Boolean).pop() || cwd);
+      }
     }
-  } catch { /* no presets visible yet */ }
-  return out;
+    return [...seen].map(([id, name]) => ({ id, name }));
+  } catch { /* no sessions visible yet */ }
+  return [];
 };
 ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
   ctx.slots.inject("settings.section", () => ctx.slots.register({

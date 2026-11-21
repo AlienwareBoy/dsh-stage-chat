@@ -1,7 +1,9 @@
 import type {} from "@deepseek-ai/dsh-settings";
 import type {} from "@deepseek-ai/dsh-system-prompt";
-// Type-only: brings the ctx.agentPresets declaration into scope without a runtime import.
-import type {} from "@deepseek-ai/dsh-agent-preset-registry";
+// Type-only: brings the "session/created" event and the AssembleContext.agent
+// field (the live Agent of each prompt assembly) into scope.
+import type {} from "@deepseek-ai/dsh-session";
+import type {} from "@deepseek-ai/dsh-agent";
 import type { Context, Volatile } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
 import { defaultJson, defaultPrompt, outputPromptOf, composedOutputPrompt, parseAgents } from "./config";
@@ -22,76 +24,42 @@ export const Config = z.object({
 });
 
 /**
- * Per-agent prompt delivery: the preset registry owns one standing scope key
- * per preset and every Agent's assembly walks up into it. The section text is
- * evaluated per assembly, so matching the assembly's scope chain against the
- * cached preset keys tells us which agent this turn belongs to. Reading a
- * cordis service without injecting it throws, so the registry is only used
- * from inside an optional "agentPresets" injection; without it every agent
- * falls back to the global defaults and nothing else changes.
+ * Per-agent prompt delivery through the workspace directory: every prompt
+ * assembly carries the live Agent (its session id), and every Session
+ * announces its header — including the absolute `cwd` — when it enters the
+ * store, before the first assembly. Requirements are keyed by that directory,
+ * so one workspace (one directory) shares one set of hard clauses. Assemblies
+ * without an Agent (diagnostics) fall back to the global defaults.
  */
-interface PresetRegistry {
-  list(): Promise<{ id: string }[]>;
-  acquireScope(id?: string): Promise<{ key: object }>;
+interface SessionDirectoryCache {
+  directories: Map<string, string | undefined>;
 }
-interface PresetScopeCache {
-  chain: ((key: object) => readonly object[]) | null;
-  keys: Map<string, object>;
-  refresh: number;
-  registry: PresetRegistry | null;
+export function createSessionDirectoryCache(): SessionDirectoryCache {
+  return { directories: new Map() };
 }
-export function createPresetScopeCache(): PresetScopeCache {
-  return { chain: null, keys: new Map(), refresh: 0, registry: null };
+export function directoryOf(cache: SessionDirectoryCache, sessionId: string | undefined): string | null {
+  if (!sessionId) return null;
+  return cache.directories.get(sessionId) ?? null;
 }
-export function presetOf(cache: PresetScopeCache, scope: object | undefined): string | null {
-  if (!scope || !cache.chain) return null;
-  try {
-    for (const key of cache.chain(scope)) {
-      for (const [id, presetKey] of cache.keys) if (presetKey === key) return id;
-    }
-  } catch { /* a torn-down scope chain resolves to global */ }
-  return null;
-}
-/** Refresh preset keys at most once a minute; the first turn after a new preset may still use defaults. */
-export function schedulePresetRefresh(cache: PresetScopeCache): void {
-  const registry = cache.registry;
-  if (!registry) return;
-  const now = Date.now();
-  if (cache.refresh && now - cache.refresh < 60000) return;
-  cache.refresh = now;
-  void (async () => {
-    // Every host touch stays inside try: an unhandled rejection here is fatal
-    // to the host process, so any failure degrades to the global defaults.
-    try {
-      if (!cache.chain) cache.chain = (await import("@deepseek-ai/dsh-scope")).scopeChainOf;
-      for (const preset of await registry.list()) {
-        const id = preset?.id;
-        if (!id || cache.keys.has(id)) continue;
-        const lease = await registry.acquireScope(id);
-        if (lease?.key) cache.keys.set(id, lease.key);
-      }
-    } catch { /* roster unavailable: keep whatever is cached */ }
-  })();
+/** Record one session's directory as it is announced; the listener never throws. */
+export function recordSession(cache: SessionDirectoryCache, session: { id: string; header: { cwd?: string } }): void {
+  cache.directories.set(session.id, session.header.cwd);
 }
 
 export function apply(ctx: Context, config: Config): void {
   ctx.inject(["settings"], child => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber));
   });
-  const presetCache = createPresetScopeCache();
-  ctx.inject(["agentPresets"], registryCtx => {
-    presetCache.registry = registryCtx.agentPresets as unknown as PresetRegistry;
-    schedulePresetRefresh(presetCache);
-  });  ctx.inject(["systemPrompt"], child => {
-    schedulePresetRefresh(presetCache);
+  const directoryCache = createSessionDirectoryCache();
+  ctx.on("session/created", session => recordSession(directoryCache, session));
+  ctx.inject(["systemPrompt"], child => {
     child.effect(() => child.systemPrompt.section({
       name: "dsh-stage-chat-output",
       order: 90,
-      text: (context: { scope?: object }) => {
-        schedulePresetRefresh(presetCache);
+      text: (context: { scope?: object; agent?: { id: string } }) => {
         const agents = parseAgents(config.agents.get());
-        const preset = presetOf(presetCache, context.scope);
-        const agentRequirements = preset && agents[preset] ? agents[preset] : "";
+        const directory = directoryOf(directoryCache, context.agent?.id);
+        const agentRequirements = directory && agents[directory] ? agents[directory] : "";
         return composedOutputPrompt(outputPromptOf(config.outputPrompt.get()),
           config.strictStages.get(), agentRequirements);
       },
