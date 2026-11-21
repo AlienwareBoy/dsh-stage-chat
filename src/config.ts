@@ -6,20 +6,29 @@ import legacyPrompt from "./legacy-output-prompt.md";
 export { defaultPrompt, defaults as defaultDesign };
 export const NAMESPACE = "focus";
 export type Design = typeof defaults;
-export interface Settings { json?: string; outputPrompt?: string; strictStages?: boolean; requiredCharts?: boolean; }
+export interface Settings { json?: string; outputPrompt?: string; strictStages?: boolean; agents?: string; }
 export const defaultJson = JSON.stringify(defaults, null, 2);
 export function outputPromptOf(value?: string): string {
   return value === undefined || value.trim() === legacyPrompt.trim() ? defaultPrompt : value;
 }
-/** Hard clauses appended to the output prompt while their settings toggles stay on. */
+/** Hard clause appended while the strict-stage toggle stays on. */
 export const STRICT_STAGES_CLAUSE =
   "- 阶段消息：每次调用工具前，必须先发一条以清楚阶段名称开头、说明当前动作与已确认发现的公开消息；只发工具调用而不先发阶段消息视为流程违规。";
-export const REQUIRED_CHARTS_CLAUSE =
-  "- 图表：凡涉及走势、对比、流程或结构的最终答复，必须包含对应的 mermaid 图表（xychart-beta、flowchart 或 mindmap），只表达已确认的数据，图前图后保留解释，不凭空补造数值。";
-export function composedOutputPrompt(prompt: string, strictStages?: boolean, requiredCharts?: boolean): string {
+/** Compose the injected section: global strict clause plus this agent's own requirements. */
+export function composedOutputPrompt(prompt: string, strictStages?: boolean, agentRequirements?: string): string {
   const clauses = [strictStages !== false ? STRICT_STAGES_CLAUSE : "",
-    requiredCharts !== false ? REQUIRED_CHARTS_CLAUSE : ""].filter(Boolean);
-  return clauses.length ? `${prompt}\n\n## 4. 行为硬性要求（设置开关附加）\n\n${clauses.join("\n")}` : prompt;
+    agentRequirements?.trim() ?? ""].filter(Boolean);
+  return clauses.length ? `${prompt}\n\n## 4. 行为硬性要求（设置附加，按 agent 生效）\n\n${clauses.join("\n")}` : prompt;
+}
+/** Per-agent requirement texts stored as JSON: preset id → free-form hard clauses. */
+export function parseAgents(value?: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(value || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const agents: Record<string, string> = {};
+    for (const [id, text] of Object.entries(parsed)) if (typeof text === "string") agents[id] = text;
+    return agents;
+  } catch { return {}; }
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);

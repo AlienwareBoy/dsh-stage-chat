@@ -8,7 +8,7 @@ const profile = boot.loadProfileDirectory("dsh", profileDir, installAnchor);
 const rows = boot.composeEntries([...profile.layers.map(layer => layer.patches), profile.patches]);
 const inventory = boot.readProfilePlugins({ binName: "dsh", profileDir, installAnchor });
 const plugin = inventory.dependencies.find(item => item.name === "dsh-stage-chat");
-if (!plugin || plugin.version !== "0.1.4" || !plugin.enabled || !plugin.bundle)
+if (!plugin || plugin.version !== "0.1.5" || !plugin.enabled || !plugin.bundle)
   throw new Error("Updated plugin is not installed and enabled");
 if (profile.skippedBundles.some(item => item.packageName === "dsh-stage-chat") || !rows.some(row => row.id === "focus"))
   throw new Error("Updated plugin does not compose into the desktop profile");

@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { ConfigForm, ConfigFormSnapshot } from "@deepseek-ai/dsh-client-ui-settings/client";
 import type { PropsRuntime, InjectFace } from "@deepseek-ai/dsh-client-ui-slots";
-import { defaultJson, defaultPrompt, designOf, parseDesign, outputPromptOf, type Settings } from "./config";
+import { defaultJson, defaultPrompt, designOf, parseDesign, parseAgents, outputPromptOf, type Settings } from "./config";
 
-export interface SettingsInjected { hooks: { form: ConfigForm<Settings> }; }
+export interface SettingsInjected {
+  hooks: { form: ConfigForm<Settings> };
+  /** Agent roster for the per-agent requirements dropdown. */
+  roster: () => Promise<{ id: string; name?: string; description?: string }[]>;
+}
 export type SettingsProps = PropsRuntime<"settings.section"> & InjectFace<SettingsInjected>;
 const colors = [
   ["交互强调色", "accent"],
@@ -31,20 +35,33 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function SettingsSection({ useForm, form }: SettingsProps & { form: ConfigForm<Settings> }) {
+export function SettingsSection({ useForm, form, roster }: SettingsProps & { form: ConfigForm<Settings> }) {
   const snapshot = useForm(s => s) as ConfigFormSnapshot<Settings>;
   const [json, setJson] = useState(defaultJson), [prompt, setPrompt] = useState(defaultPrompt);
-  const [strict, setStrict] = useState(true), [charts, setCharts] = useState(true);
+  const [strict, setStrict] = useState(true);
+  const [agents, setAgents] = useState<Record<string, string>>({});
+  const [rosterItems, setRosterItems] = useState<{ id: string; name?: string; description?: string }[]>([]);
+  const [selected, setSelected] = useState("");
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [note, setNote] = useState("");
   const revision = useRef<number>();
+  useEffect(() => {
+    void roster().then(items => setRosterItems(items)).catch(() => setRosterItems([]));
+  }, [roster]);
   useEffect(() => {
     if (dirty) return;
     setJson(snapshot.value?.json ?? defaultJson);
     setPrompt(outputPromptOf(snapshot.value?.outputPrompt));
     setStrict(snapshot.value?.strictStages ?? true);
-    setCharts(snapshot.value?.requiredCharts ?? true);
+    setAgents(parseAgents(snapshot.value?.agents));
     revision.current = snapshot.revision;
   }, [snapshot.value, snapshot.revision, dirty]);
+  const editAgents = (id: string, text: string) => {
+    setDirty(true); setAgents(old => {
+      const next = { ...old };
+      if (text.trim()) next[id] = text; else delete next[id];
+      return next;
+    }); setNote("");
+  };
   const editJson = (value: string) => { setDirty(true); setJson(value); setNote(""); };
   const save = async () => {
     setNote("");
@@ -54,7 +71,7 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
         { op: "set", path: ["json"], value: json },
         { op: "set", path: ["outputPrompt"], value: prompt },
         { op: "set", path: ["strictStages"], value: strict },
-        { op: "set", path: ["requiredCharts"], value: charts }
+        { op: "set", path: ["agents"], value: JSON.stringify(agents) }
       ], revision.current);
       if (accepted) { setDirty(false); setNote("已保存并应用。提示词将在下一次模型请求时读取。"); }
       else setNote("宿主未接受保存。请检查配置是否可写；若另一窗口已修改，请重新载入后再保存。");
@@ -87,28 +104,38 @@ export function SettingsSection({ useForm, form }: SettingsProps & { form: Confi
       onChange={e => editJson(e.target.value)} disabled={busy} /></label>
     <label>回复规则<textarea aria-label="回复规则" value={prompt} rows={9}
       onChange={e => { setDirty(true); setPrompt(e.target.value); setNote(""); }} disabled={busy} /></label>
-    <p>以下开关在回复规则之外附加硬性条款，与回复规则一同在下一次模型请求时生效。</p>
+    <p>以下开关与个性化要求在回复规则之外附加硬性条款，一同在下一次模型请求时生效。</p>
     <label className="focus-toggle"><input type="checkbox" checked={strict}
       onChange={e => { setDirty(true); setStrict(e.target.checked); setNote(""); }} disabled={busy} />
       严格阶段消息：工具调用前必须先发以阶段名称开头的公开消息</label>
-    <label className="focus-toggle"><input type="checkbox" checked={charts}
-      onChange={e => { setDirty(true); setCharts(e.target.checked); setNote(""); }} disabled={busy} />
-      必须图表：走势、对比、流程类答复必须附 mermaid 图表</label>
+    <label>Agent 个性化要求<select aria-label="选择 Agent" value={selected}
+        onChange={e => { setSelected(e.target.value); setNote(""); }} disabled={busy}>
+        <option value="">选择 Agent…</option>
+        {rosterItems.map(item => <option key={item.id} value={item.id}>
+          {item.name || item.id}{agents[item.id] ? "（已设置）" : ""}
+        </option>)}
+      </select></label>
+    {selected && <>
+      <textarea aria-label={`${selected} 的个性化要求`} rows={5} placeholder="留空使用上方默认。图表等要求在此按需添加，例如：凡涉及走势对比的答复，必须附 mermaid 图表。"
+        value={agents[selected] ?? ""} spellCheck={false}
+        onChange={e => editAgents(selected, e.target.value)} disabled={busy} />
+      <p>该要求只附加到 {rosterItems.find(item => item.id === selected)?.name || selected} 的提示词；留空则完全沿用默认。保存后下一次该 Agent 的请求生效。</p>
+    </>}
     <p>配色和文案可改。任务状态由真实宿主事件决定；开发提示词不注入运行会话。</p>
     <div className="focus-actions">
       <button disabled={disabled} onClick={save}>{busy ? "保存中…" : "保存并应用"}</button>
       <button disabled={busy} onClick={() => { setDirty(true); setJson(defaultJson); setPrompt(defaultPrompt);
-        setStrict(true); setCharts(true); setNote("已恢复默认草稿，请保存并应用。"); }}>恢复默认</button>
+        setStrict(true); setAgents({}); setNote("已恢复默认草稿，请保存并应用。"); }}>恢复默认</button>
       <button disabled={busy} onClick={() => {
         setDirty(false); setNote(""); setJson(snapshot.value?.json ?? defaultJson);
         setPrompt(outputPromptOf(snapshot.value?.outputPrompt));
-        setStrict(snapshot.value?.strictStages ?? true); setCharts(snapshot.value?.requiredCharts ?? true);
+        setStrict(snapshot.value?.strictStages ?? true); setAgents(parseAgents(snapshot.value?.agents));
         revision.current = snapshot.revision;
       }}>重新载入</button>
       <button onClick={() => {
-        try { download(JSON.stringify({ format: "dsh-stage-chat-plugin-settings", version: 2,
+        try { download(JSON.stringify({ format: "dsh-stage-chat-plugin-settings", version: 3,
           configuration: parseDesign(json), outputPrompt: prompt,
-          strictStages: strict, requiredCharts: charts }, null, 2), "dsh-stage-chat-plugin-settings.json"); }
+          strictStages: strict, agents }, null, 2), "dsh-stage-chat-plugin-settings.json"); }
         catch (e) { setNote(String(e)); }
       }}>导出设置 JSON</button>
     </div>
