@@ -6,26 +6,24 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  profileDir,
+  retargetFocusName,
+  dedupeFocusFibers,
+  runProfileInstall
+} from "./pnpm-profile.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devDir = join(root, "dev");
-const profile = join(homedir(), ".dsh/profiles/desktop");
-const pkgPath = join(profile, "package.json");
-const patchPath = join(profile, "cordis.patch.yml");
+const pkgPath = join(profileDir, "package.json");
+const patchPath = join(profileDir, "cordis.patch.yml");
 const linkSpec = `link:${devDir}`;
 
-function run(cmd, args, cwd, env = {}) {
-  const result = spawnSync(cmd, args, {
-    cwd, stdio: "inherit", shell: false,
-    env: { ...process.env, ...env }
-  });
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
-run(process.execPath, [join(root, "scripts/build.mjs")], root);
+spawnSync(process.execPath, [join(root, "scripts/build.mjs")], {
+  cwd: root, stdio: "inherit"
+}).status === 0 || process.exit(1);
 
 if (!existsSync(pkgPath)) {
   console.error(`Desktop profile not found: ${pkgPath}`);
@@ -42,8 +40,8 @@ pkg.dependencies["dsh-stage-chat-dev"] = linkSpec;
 
 const bundles = pkg.dsh?.profile?.bundles;
 if (Array.isArray(bundles)) {
-  const next = bundles.filter(name => name !== "dsh-stage-chat");
-  if (!next.includes("dsh-stage-chat-dev")) next.push("dsh-stage-chat-dev");
+  const next = bundles.filter(name => name !== "dsh-stage-chat" && name !== "dsh-stage-chat-dev");
+  next.push("dsh-stage-chat-dev");
   pkg.dsh.profile.bundles = next;
 }
 
@@ -56,29 +54,15 @@ if (existsSync(patchPath)) {
   const patchBackup = `${patchPath}.bak-before-stage-chat-dev`;
   if (!existsSync(patchBackup)) copyFileSync(patchPath, patchBackup);
   let patch = readFileSync(patchPath, "utf8");
-  // Keep id: focus (settings). Only retarget the package name under that fiber.
-  patch = patch.replace(
-    /(id:\s*focus\n\s*name:\s*)dsh-stage-chat\b/,
-    "$1dsh-stage-chat-dev"
-  );
+  patch = dedupeFocusFibers(patch);
+  // Accept either release or already-dev names; never stack another -dev.
+  patch = retargetFocusName(patch, "dsh-stage-chat-dev-dev", "dsh-stage-chat-dev");
+  patch = retargetFocusName(patch, "dsh-stage-chat", "dsh-stage-chat-dev");
   writeFileSync(patchPath, patch);
   console.log(`Retargeted cordis fiber focus → name: dsh-stage-chat-dev`);
 }
 
-const pnpm = [
-  "install",
-  "--force",
-  "--ignore-scripts",
-  "--registry=https://registry.npmjs.org"
-];
-const which = spawnSync("which", ["pnpm"], { encoding: "utf8" });
-const pnpmBin = which.status === 0 ? which.stdout.trim() : null;
-if (!pnpmBin) {
-  console.error("pnpm not on PATH. Profile package.json is updated; run pnpm install inside the app or:");
-  console.error(`  cd ${profile} && pnpm install --force`);
-  process.exit(1);
-}
-run(pnpmBin, pnpm, profile, { CI: "1", PNPM_CONFIRM: "false" });
+runProfileInstall(profileDir);
 
 console.log(`
 Done. Next:
