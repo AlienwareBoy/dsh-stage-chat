@@ -29,7 +29,7 @@ const settings: ObservableSnapshot<Settings | undefined> = {
 const roster = async (): Promise<{ id: string; name?: string; description?: string }[]> => {
   const out: { id: string; name?: string; description?: string }[] = [];
   try {
-    const presets = (ctx as { agentPresets?: { remoteExportList?: () => Promise<{
+    const presets = (ctx as unknown as { agentPresets?: { remoteExportList?: () => Promise<{
       presets?: { id: string; name?: string; description?: string }[] }> } }).agentPresets;
     if (presets?.remoteExportList) {
       const rosterData = await presets.remoteExportList();
