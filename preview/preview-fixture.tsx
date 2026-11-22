@@ -338,15 +338,43 @@ const ctx = {
       }
     }),
     list: { getSnapshot: () => ({ byId: { preview: { cwd: "/tmp/preview" } } }) },
-    fork: async (opts: { sessionId: string; atSeq?: number }) => {
+    fork: async (opts: {
+      sessionId: string; atSeq?: number; increaseTitle?: boolean;
+      onCreated?: (childId: string) => void;
+    }) => {
       (window as any).__lastFork = opts;
-      return `preview-fork-${opts.atSeq ?? "latest"}`;
+      // Preview stand-in for host fork: keep only history at/before the cut.
+      if (typeof opts.atSeq === "number") {
+        turns = turns.filter(t => t.status === "closed" && t.endSeq <= opts.atSeq!);
+        busy = false;
+        publish();
+        window.dispatchEvent(new CustomEvent("dsh-stage-chat-preview-mount-all"));
+      }
+      const childId = `preview-fork-${opts.atSeq ?? "latest"}`;
+      opts.onCreated?.(childId);
+      const note = document.getElementById("preview-note");
+      if (note) {
+        note.textContent = `已从此前分支（预览）：保留到 seq ${opts.atSeq ?? "latest"}，共 ${turns.length} 轮`;
+        note.hidden = false;
+        window.setTimeout(() => { note.hidden = true; }, 2600);
+      }
+      return childId;
     }
   },
   uiSession: { sessionStatus: pending },
   uiConversation: { binding: () => ({ target: () => chat }) },
   sidebarRight: { openResource: (address: string) => { (window as any).lastOpened = address; } },
-  uiWorkspace: { openSession: (id: string) => { (window as any).__openedSession = id; } }
+  uiWorkspace: {
+    openSession: (id: string) => {
+      (window as any).__openedSession = id;
+      const note = document.getElementById("preview-note");
+      if (note) {
+        note.textContent = `预览已切换到分支会话 ${id}`;
+        note.hidden = false;
+        window.setTimeout(() => { note.hidden = true; }, 2600);
+      }
+    }
+  }
 };
 
 pluginExports.apply(ctx);

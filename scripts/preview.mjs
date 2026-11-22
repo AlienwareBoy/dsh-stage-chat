@@ -95,6 +95,10 @@ body{margin:0;font:13px/1.5 system-ui,sans-serif;background:var(--dsw-alias-bg-b
 #native-composer button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid transparent;
   background:#ff7500;color:#fff;cursor:pointer}
 #native-composer button:disabled{opacity:.45;cursor:default}
+#preview-note{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;
+  padding:8px 14px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);
+  background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);
+  box-shadow:0 8px 24px rgba(0,0,0,.12);font-size:12.5px;white-space:nowrap}
 ${css}
 </style>
 <div id="preview-bar">
@@ -102,8 +106,9 @@ ${css}
   <button type="button" id="btn-theme">切换深/浅色</button>
   <button type="button" id="btn-jump">跳到第 2 轮</button>
   <button type="button" id="btn-mount-all">临时挂载全部轮次</button>
-  <span class="hint">底部可输入发送 · 会模拟执行过程与最终答复</span>
+  <span class="hint">底部可发送 · 气泡左：分支 / 复制原文</span>
 </div>
+<div id="preview-note" hidden></div>
 <div id="fixture"></div>
 <script>${js.replaceAll("</script", "<\\/script")}</script>
 </html>`;

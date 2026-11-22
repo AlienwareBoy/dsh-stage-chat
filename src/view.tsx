@@ -160,19 +160,26 @@ function StageSeat({ stage, turn, current, blocked, d }: {
   </Disclosure>;
 }
 const FORK_TOAST = "从此前分支新对话";
+const COPY_TOAST = "复制用户原文";
 const PLACEHOLDER_HEIGHT = 360;
 const plainPreview = (text: string) =>
   text.replace(/[#*`>\-\[\]()|_]/g, " ").replace(/\s+/g, " ").trim();
 
-function ForkButton({ onFork }: { onFork: () => void }) {
+function TipButton({ label, onClick, children }: {
+  label: string; onClick: () => void; children: ReactNode;
+}) {
   const [tip, setTip] = useState(false);
-  return <button type="button" className="focus-fork" aria-label={FORK_TOAST}
-    onClick={onFork} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+  const [flash, setFlash] = useState("");
+  return <button type="button" className="focus-tool" aria-label={label}
+    onClick={async () => {
+      await onClick();
+      setFlash(label.startsWith("复制") ? "已复制" : "已分支");
+      setTimeout(() => setFlash(""), 1200);
+    }}
+    onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
     onFocus={() => setTip(true)} onBlur={() => setTip(false)}>
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-      <path fill="currentColor" d="M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5 6v2.5A2.5 2.5 0 0 0 7.5 11H9v1a2 2 0 1 0 2 0V8.5A2.5 2.5 0 0 0 8.5 6H5Zm0 0V4"/>
-    </svg>
-    {tip && <span className="focus-toast" role="tooltip">{FORK_TOAST}</span>}
+    {children}
+    {(flash || tip) && <span className="focus-toast" role="tooltip">{flash || label}</span>}
   </button>;
 }
 
@@ -189,7 +196,18 @@ function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
   return <article className="focus-turn" data-turn={id} data-mounted="1">
     {turn.users.map(user => <div key={user.id} className="focus-user-block">
       <div className="focus-user-row">
-        {canFork && <ForkButton onFork={() => onFork!(forkBeforeSeq!)} />}
+        <div className="focus-tools" aria-label="消息操作">
+          {canFork && <TipButton label={FORK_TOAST} onClick={() => onFork!(forkBeforeSeq!)}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" d="M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5 6v2.5A2.5 2.5 0 0 0 7.5 11H9v1a2 2 0 1 0 2 0V8.5A2.5 2.5 0 0 0 8.5 6H5Zm0 0V4"/>
+            </svg>
+          </TipButton>}
+          <TipButton label={COPY_TOAST} onClick={() => { void copyText(user.text); }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" d="M6 2h6a2 2 0 0 1 2 2v6h-1.5V4a.5.5 0 0 0-.5-.5H6V2Zm-3 3h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 1.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V7a.5.5 0 0 0-.5-.5H3Z"/>
+            </svg>
+          </TipButton>
+        </div>
         <div className="focus-user focus-metal">
           <Md text={user.text} compact />
           {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
