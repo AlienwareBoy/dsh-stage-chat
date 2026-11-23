@@ -5,6 +5,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 import type {} from "@deepseek-ai/dsh-api-session-controller/client";
+// Side-effect types: uiWorkspace.openSession (provided by the conversation shell).
 import type { SessionPendingInteraction } from "@deepseek-ai/dsh-client-ui-session/client";
 import { fileAddressFor } from "@deepseek-ai/dsh-util-workspace-path";
 import type { ObservableSnapshot } from "@deepseek-ai/dsh-client-store";
@@ -15,49 +16,55 @@ import { SettingsSection } from "./settings";
 import { installChatTabDedup } from "./integration";
 import css from "./styles.css";
 
-export const inject = ["slots", "sessions", "uiSession", "uiConversation", "sidebarRight", "configForms"];
+// uiWorkspace is required so fork can switch into the child session (same as native Chat).
+export const inject = [
+  "slots", "sessions", "uiWorkspace", "uiSession", "uiConversation", "sidebarRight", "configForms"
+];
 export function apply(ctx: Context): void {
   ctx.effect(() => {
     const style = document.createElement("style"); style.dataset.dshFocusStyles = "";
     style.textContent = css; document.head.append(style); return () => style.remove();
   });
-const form = ctx.configForms.get<Settings>(NAMESPACE);
-const settings: ObservableSnapshot<Settings | undefined> = {
-  getSnapshot: () => form.getSnapshot().value, subscribe: listener => form.subscribe(listener)
-};
-/** Agent roster = distinct workspace directories of the loaded sessions. */
-const roster = async (): Promise<{ id: string; name?: string; description?: string }[]> => {
-  try {
-    const byId = (ctx.sessions.list.getSnapshot() as { byId?: Record<string, {
-      cwd?: string | null }> }).byId ?? {};
-    const seen = new Map<string, string>();
-    for (const session of Object.values(byId)) {
-      const cwd = session?.cwd;
-      if (typeof cwd === "string" && cwd && !seen.has(cwd)) {
-        seen.set(cwd, cwd.split("/").filter(Boolean).pop() || cwd);
+  const form = ctx.configForms.get<Settings>(NAMESPACE);
+  const settings: ObservableSnapshot<Settings | undefined> = {
+    getSnapshot: () => form.getSnapshot().value, subscribe: listener => form.subscribe(listener)
+  };
+  /** Agent roster = distinct workspace directories of the loaded sessions. */
+  const roster = async (): Promise<{ id: string; name?: string; description?: string }[]> => {
+    try {
+      const byId = (ctx.sessions.list.getSnapshot() as { byId?: Record<string, {
+        cwd?: string | null }> }).byId ?? {};
+      const seen = new Map<string, string>();
+      for (const session of Object.values(byId)) {
+        const cwd = session?.cwd;
+        if (typeof cwd === "string" && cwd && !seen.has(cwd)) {
+          seen.set(cwd, cwd.split("/").filter(Boolean).pop() || cwd);
+        }
       }
-    }
-    return [...seen].map(([id, name]) => ({ id, name }));
-  } catch { /* no sessions visible yet */ }
-  return [];
-};
-ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
-  ctx.slots.inject("settings.section", () => ctx.slots.register({
-    name: "settings.section", id: "dsh-stage-chat", order: 31, label: "对话显示",
-    inject: () => ({ hooks: { form }, form, roster })
-  }, SettingsSection))
-));
+      return [...seen].map(([id, name]) => ({ id, name }));
+    } catch { /* no sessions visible yet */ }
+    return [];
+  };
+  ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
+    ctx.slots.inject("settings.section", () => ctx.slots.register({
+      name: "settings.section", id: "dsh-stage-chat", order: 31, label: "对话显示",
+      inject: () => ({ hooks: { form }, form, roster })
+    }, SettingsSection))
+  ));
   ctx.slots.inject("conversation.view", () => ctx.slots.register({
     name: "conversation.view", id: "chat", order: 0, priority: -100, label: "对话",
     inject: (sessionId): Injected => {
       const binding = ctx.sessions.binding(sessionId);
       if (!binding) throw new Error(`dsh-stage-chat: unknown session ${sessionId}`);
       const target = ctx.uiConversation.binding(binding).target("chat");
-      const source = { getSnapshot: () => {
-        const value = target.getSnapshot();
-        if (!value) throw new Error("dsh-stage-chat: Chat target unavailable");
-        return value;
-      }, subscribe: target.subscribe.bind(target) };
+      const source = {
+        getSnapshot: () => {
+          const value = target.getSnapshot();
+          if (!value) throw new Error("dsh-stage-chat: Chat target unavailable");
+          return value;
+        },
+        subscribe: target.subscribe.bind(target)
+      };
       const sources = new Map<string, ObservableSnapshot<Turn>>();
       const pending: ObservableSnapshot<SessionPendingInteraction | undefined> = {
         getSnapshot: () => ctx.uiSession.sessionStatus.getSnapshot().get(sessionId)?.pendingInteraction,
@@ -65,24 +72,28 @@ ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () =>
       };
       return {
         hooks: { settings, pending },
-        keyedHooks: { turn: key => {
-          let value = sources.get(key);
-          if (!value) { value = turnSource(source, Number(key)); sources.set(key, value); }
-          return value;
-        }},
+        keyedHooks: {
+          turn: key => {
+            let value = sources.get(key);
+            if (!value) { value = turnSource(source, Number(key)); sources.set(key, value); }
+            return value;
+          }
+        },
         openFile: path => {
           const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
           ctx.sidebarRight.openResource(fileAddressFor(sessionId, cwd, path));
         },
         loadOlder: () => binding.session.loadOlder(),
-        forkAt: seq => {
-          const open = (ctx as Context & {
-            uiWorkspace?: { openSession?(id: string): void }
-          }).uiWorkspace?.openSession;
-          void ctx.sessions.fork({
-            sessionId, atSeq: seq, increaseTitle: true,
-            onCreated: childId => { open?.(childId); }
-          }).catch(() => { /* leave the source view unchanged */ });
+        forkAt: async seq => {
+          const childId = await ctx.sessions.fork({
+            sessionId, atSeq: seq, increaseTitle: true
+          });
+          // Prefer the injected service; fall back to get() for shells that only expose it that way.
+          const workspace = (ctx as Context & {
+            uiWorkspace?: { openSession(id: string): void }
+          }).uiWorkspace ?? ctx.get("uiWorkspace") as { openSession(id: string): void } | undefined;
+          if (!workspace?.openSession) throw new Error("宿主无法打开新对话");
+          workspace.openSession(childId);
         }
       };
     }

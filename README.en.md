@@ -7,7 +7,7 @@ dsh-stage-chat is a stage-based conversation view for DeepSeek Harness. It repla
 | Item | Value |
 | --- | --- |
 | Package | `dsh-stage-chat` |
-| Version | 0.1.7 |
+| Version | 0.1.8 |
 | Compatibility | DeepSeek Harness 0.2.2-rc.5 and earlier |
 | Mount point | `chat`, priority `-100` |
 | License | [MIT](LICENSE) |
@@ -71,5 +71,5 @@ npm pack
 These commands do not start Harness. The packed archive can be installed locally:
 
 ```bash
-dsh plugin --profile web add ./dsh-stage-chat-0.1.7.tgz
+dsh plugin --profile web add ./dsh-stage-chat-0.1.8.tgz
 ```

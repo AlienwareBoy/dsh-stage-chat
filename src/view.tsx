@@ -14,8 +14,8 @@ export interface Injected {
   hooks: { settings: ObservableSnapshot<Settings | undefined>; pending: ObservableSnapshot<SessionPendingInteraction | undefined> };
   keyedHooks: { turn: (key: string) => ObservableSnapshot<Turn> };
   openFile(path: string): void; loadOlder(): Promise<void>;
-  /** Host fork cut; omitted when the binding cannot branch. */
-  forkAt?(seq: number): void;
+  /** Host fork cut; omitted when the binding cannot branch. Resolves after the child session opens. */
+  forkAt?(seq: number): void | Promise<void>;
 }
 export type ViewProps = PropsRuntime<"conversation.view"> & InjectFace<Injected>;
 const labels: MarkdownLabels = { code: { copyLabel: "复制", copiedLabel: "已复制" }, footnotes: "来源" };
@@ -159,22 +159,34 @@ function StageSeat({ stage, turn, current, blocked, d }: {
     </Disclosure>}
   </Disclosure>;
 }
-const FORK_TOAST = "从此前分支新对话";
+const FORK_TOAST = "从这句话之前另开对话";
+const FORK_FLASH = "已另开对话";
 const COPY_TOAST = "复制用户原文";
+const COPY_FLASH = "已复制";
 const PLACEHOLDER_HEIGHT = 360;
 const plainPreview = (text: string) =>
   text.replace(/[#*`>\-\[\]()|_]/g, " ").replace(/\s+/g, " ").trim();
 
-function TipButton({ label, onClick, children }: {
-  label: string; onClick: () => void; children: ReactNode;
+function TipButton({ label, doneLabel, failLabel, onClick, children }: {
+  label: string; doneLabel: string; failLabel?: string;
+  onClick: () => void | Promise<void>; children: ReactNode;
 }) {
   const [tip, setTip] = useState(false);
   const [flash, setFlash] = useState("");
-  return <button type="button" className="focus-tool" aria-label={label}
+  const [busy, setBusy] = useState(false);
+  return <button type="button" className="focus-tool" aria-label={label} disabled={busy}
     onClick={async () => {
-      await onClick();
-      setFlash(label.startsWith("复制") ? "已复制" : "已分支");
-      setTimeout(() => setFlash(""), 1200);
+      if (busy) return;
+      setBusy(true);
+      try {
+        await onClick();
+        setFlash(doneLabel);
+      } catch {
+        setFlash(failLabel || "操作失败");
+      } finally {
+        setBusy(false);
+        setTimeout(() => setFlash(""), 1800);
+      }
     }}
     onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
     onFocus={() => setTip(true)} onBlur={() => setTip(false)}>
@@ -185,7 +197,7 @@ function TipButton({ label, onClick, children }: {
 
 function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
   { id: number; useTurn: ViewProps["useTurn"]; d: Design; pending?: SessionPendingInteraction; latest: boolean;
-    forkBeforeSeq: number | null; onFork?: (seq: number) => void;
+    forkBeforeSeq: number | null; onFork?: (seq: number) => void | Promise<void>;
   }) {
   const turn = useTurn(String(id));
   if (!turn) return null;
@@ -197,12 +209,16 @@ function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
     {turn.users.map(user => <div key={user.id} className="focus-user-block">
       <div className="focus-user-row">
         <div className="focus-tools" aria-label="消息操作">
-          {canFork && <TipButton label={FORK_TOAST} onClick={() => onFork!(forkBeforeSeq!)}>
+          {canFork && <TipButton label={FORK_TOAST} doneLabel={FORK_FLASH} failLabel="另开对话失败"
+            onClick={() => onFork!(forkBeforeSeq!)}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
               <path fill="currentColor" d="M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5 6v2.5A2.5 2.5 0 0 0 7.5 11H9v1a2 2 0 1 0 2 0V8.5A2.5 2.5 0 0 0 8.5 6H5Zm0 0V4"/>
             </svg>
           </TipButton>}
-          <TipButton label={COPY_TOAST} onClick={() => { void copyText(user.text); }}>
+          <TipButton label={COPY_TOAST} doneLabel={COPY_FLASH} failLabel="复制失败"
+            onClick={async () => {
+              if (!await copyText(user.text)) throw new Error("copy failed");
+            }}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
               <path fill="currentColor" d="M6 2h6a2 2 0 0 1 2 2v6h-1.5V4a.5.5 0 0 0-.5-.5H6V2Zm-3 3h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 1.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V7a.5.5 0 0 0-.5-.5H3Z"/>
             </svg>
@@ -265,9 +281,9 @@ function TurnPlaceholder({ id, height }: { id: number; height: number }) {
 export function themeStyle(d: Design, light: boolean): CSSProperties {
   const a = d.appearance, colors = a.themes[light ? "light" : "dark"];
   const style: Record<string, string | number> = {};
+  // Do not bind text / userText / secondary to host label tokens — they are often too light to read.
   const host: Record<string, string> = {
     bg: "--dsw-alias-bg-base", surface: "--dsw-alias-bg-layer-1", bubble: "--dsw-specific-bubble",
-    text: "--dsw-alias-label-primary", secondary: "--dsw-alias-label-secondary",
     border: "--dsw-alias-border-l1"
   };
   Object.entries(colors).forEach(([key, value]) => {
@@ -275,7 +291,18 @@ export function themeStyle(d: Design, light: boolean): CSSProperties {
     style[`--focus-${key}`] = host[key] && value === defaults[key as keyof typeof defaults] ?
       `var(${host[key]},${value})` : value;
   });
+  // MarkdownText hard-codes var(--dsw-alias-label-*); rebind them here or body/bubble stay host-gray.
+  const text = colors.text, userText = colors.userText, secondary = colors.secondary, subtle = colors.subtle;
   Object.assign(style, {
+    "--focus-text": text,
+    "--focus-userText": userText,
+    "--focus-user-text": userText,
+    "--focus-secondary": secondary,
+    "--focus-subtle": subtle,
+    "--dsw-alias-label-primary": text,
+    "--dsw-alias-label-secondary": secondary,
+    "--dsw-alias-label-tertiary": subtle,
+    "--dsw-alias-link": text,
     "--focus-accent": a.accent, "--focus-done": a.statusColors.completed[light ? "light" : "dark"],
     "--focus-failed": a.statusColors.failed, "--focus-warning": a.statusColors.warning,
     "--focus-diagnostic": a.faultPair.diagnostic, "--focus-radius": `${a.metal.bubbleRadiusPx}px`,
@@ -541,7 +568,8 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
         })} /></div>}
         {order.map((id, i) => {
           const prev = i > 0 ? order[i - 1]! : null;
-          const forkBeforeSeq = prev !== null ? endSeqOf(prev) : null;
+          // First turn: cut at 0（丢掉本句及之后）. Later turns: cut after the previous turn.
+          const forkBeforeSeq = prev === null ? 0 : endSeqOf(prev);
           if (!mounted.has(id))
             return <TurnPlaceholder key={id} id={id} height={heights.current.get(id) ?? PLACEHOLDER_HEIGHT} />;
           return <TurnSeat key={id} id={id} useTurn={useTurn} d={d} pending={pending}

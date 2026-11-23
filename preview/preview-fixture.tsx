@@ -384,7 +384,11 @@ const sourceHook = (source: any) => (selector = (v: any) => v) =>
 
 const view = slots.entriesOfSlot("conversation.view").find((e: any) => e.options.id === "chat")
   ?? slots.entriesOfSlot("conversation.view")[0];
+const settings = slots.entriesOfSlot("settings.section").find((e: any) =>
+  e.options.id === "dsh-stage-chat" || e.options.id === "dsh-stage-chat-dev"
+) ?? slots.entriesOfSlot("settings.section")[0];
 const injected = (view as any).inject("preview");
+const settingsInject = settings ? (settings as any).inject() : null;
 
 const props = {
   sessionId: "preview",
@@ -430,21 +434,48 @@ function Composer() {
   </div>;
 }
 
-const root = createRoot(document.getElementById("fixture")!);
-root.render(
-  <div id="plugin-view" className={nativeCss.root} data-phase="active">
-    <div className={nativeCss.body}>
-      <div id="native-scroll" className={nativeCss.scrollBody}>
-        <div className={nativeCss.viewArea}>
-          <view.component {...props} />
-        </div>
-        <div className={nativeCss.composerSeat}>
-          <Composer />
+function PreviewApp() {
+  const [panel, setPanel] = React.useState<"chat" | "settings">("chat");
+  React.useEffect(() => {
+    const onPanel = (e: Event) => {
+      const next = (e as CustomEvent<"chat" | "settings">).detail;
+      if (next === "chat" || next === "settings") setPanel(next);
+    };
+    window.addEventListener("dsh-stage-chat-preview-panel", onPanel as EventListener);
+    return () => window.removeEventListener("dsh-stage-chat-preview-panel", onPanel as EventListener);
+  }, []);
+  React.useEffect(() => {
+    document.querySelectorAll("#preview-bar [data-panel]").forEach(btn => {
+      (btn as HTMLElement).dataset.active = btn.getAttribute("data-panel") === panel ? "1" : "0";
+    });
+  }, [panel]);
+  if (panel === "settings" && settings) {
+    return <div id="plugin-settings" style={{ height: "calc(100vh - 52px)", overflow: "auto", padding: "16px 20px" }}>
+      <settings.component
+        form={settingsInject?.form ?? form}
+        useForm={sourceHook(settingsInject?.hooks?.form ?? form)}
+        roster={settingsInject?.roster ?? (async () => [{ id: "/tmp/preview", name: "preview" }])}
+      />
+    </div>;
+  }
+  return (
+    <div id="plugin-view" className={nativeCss.root} data-phase="active">
+      <div className={nativeCss.body}>
+        <div id="native-scroll" className={nativeCss.scrollBody}>
+          <div className={nativeCss.viewArea}>
+            <view.component {...props} />
+          </div>
+          <div className={nativeCss.composerSeat}>
+            <Composer />
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+}
+
+const root = createRoot(document.getElementById("fixture")!);
+root.render(<PreviewApp />);
 
 (window as any).preview = {
   jump(turn: number) {
@@ -457,6 +488,9 @@ root.render(
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
   },
+  panel(next: "chat" | "settings") {
+    window.dispatchEvent(new CustomEvent("dsh-stage-chat-preview-panel", { detail: next }));
+  },
   send: sendMessage
 };
 
@@ -465,8 +499,16 @@ document.getElementById("btn-theme")?.addEventListener("click", () => {
   (window as any).preview.theme(dark);
 });
 document.getElementById("btn-jump")?.addEventListener("click", () => {
+  (window as any).preview.panel("chat");
   (window as any).preview.jump(2);
 });
 document.getElementById("btn-mount-all")?.addEventListener("click", () => {
+  (window as any).preview.panel("chat");
   (window as any).preview.mountAll();
+});
+document.getElementById("btn-chat")?.addEventListener("click", () => {
+  (window as any).preview.panel("chat");
+});
+document.getElementById("btn-settings")?.addEventListener("click", () => {
+  (window as any).preview.panel("settings");
 });

@@ -62,7 +62,7 @@ const html = `<!doctype html>
 :root{
   --dsw-alias-bg-base:#ffffff;
   --dsw-alias-bg-layer-1:#f7f8fa;
-  --dsw-alias-label-primary:#202124;
+  --dsw-alias-label-primary:#000000;
   --dsw-alias-label-secondary:#60646c;
   --dsw-alias-border-l1:rgba(10,10,10,.16);
   --dsw-specific-bubble:#f3f4f6;
@@ -82,6 +82,7 @@ body{margin:0;font:13px/1.5 system-ui,sans-serif;background:var(--dsw-alias-bg-b
   padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
 #preview-bar button{font:inherit;padding:5px 10px;border-radius:7px;border:1px solid var(--dsw-alias-border-l1);
   background:transparent;color:inherit;cursor:pointer}
+#preview-bar button[data-active="1"]{background:var(--dsw-specific-bubble);border-color:transparent;font-weight:600}
 #preview-bar .hint{font-size:12px;color:var(--dsw-alias-label-secondary);margin-left:auto}
 #plugin-view{height:calc(100vh - 52px)}
 #native-composer{display:flex;flex-direction:column;gap:8px;min-height:118px;padding:12px 16px;
@@ -103,10 +104,12 @@ ${css}
 </style>
 <div id="preview-bar">
   <strong>dsh-stage-chat 预览</strong>
+  <button type="button" id="btn-chat" data-panel="chat" data-active="1">对话</button>
+  <button type="button" id="btn-settings" data-panel="settings" data-active="0">设置 · 配色/JSON</button>
   <button type="button" id="btn-theme">切换深/浅色</button>
   <button type="button" id="btn-jump">跳到第 2 轮</button>
   <button type="button" id="btn-mount-all">临时挂载全部轮次</button>
-  <span class="hint">底部可发送 · 气泡左：分支 / 复制原文</span>
+  <span class="hint">设置页可看配色实例 + JSON 搜索（font / window）</span>
 </div>
 <div id="preview-note" hidden></div>
 <div id="fixture"></div>
