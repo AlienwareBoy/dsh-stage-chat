@@ -26,7 +26,7 @@ function Mermaid({ code, streaming }: { code: string; streaming: boolean }) {
     if (streaming || !visible) return;
     queue = queue.catch(() => {}).then(async () => {
       if (!live) return;
-      const text = light ? "#202124" : "#e4e4e7", bg = light ? "#ffffff" : "#202022",
+      const text = light ? "#000000" : "#e4e4e7", bg = light ? "#ffffff" : "#202022",
         surface = light ? "#f4f5f7" : "#29292c", border = light ? "#c8cbd1" : "#606066";
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base",
         suppressErrorRendering: true,

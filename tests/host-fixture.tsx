@@ -91,8 +91,10 @@ const ctx = {
     binding: () => ({ session: { loadOlder: async () => {
       older = true; session.set({ hasMore: false, loadingOlder: false }); chat.set(makeChat());
     } } }),
-    list: { getSnapshot: () => ({ byId: { fixture: { cwd: "/tmp" } } }) }
+    list: { getSnapshot: () => ({ byId: { fixture: { cwd: "/tmp" } } }) },
+    fork: async () => "fixture-fork"
   },
+  uiWorkspace: { openSession: () => {} },
   uiSession: { sessionStatus: pending },
   uiConversation: { binding: () => ({ target: () => chat }) },
   sidebarRight: { openResource: (address: string) => { (window as any).lastOpened = address; } }

@@ -14,6 +14,8 @@ export interface Injected {
   hooks: { settings: ObservableSnapshot<Settings | undefined>; pending: ObservableSnapshot<SessionPendingInteraction | undefined> };
   keyedHooks: { turn: (key: string) => ObservableSnapshot<Turn> };
   openFile(path: string): void; loadOlder(): Promise<void>;
+  /** Host fork cut; omitted when the binding cannot branch. Resolves after the child session opens. */
+  forkAt?(seq: number): void | Promise<void>;
 }
 export type ViewProps = PropsRuntime<"conversation.view"> & InjectFace<Injected>;
 const labels: MarkdownLabels = { code: { copyLabel: "复制", copiedLabel: "已复制" }, footnotes: "来源" };
@@ -157,22 +159,80 @@ function StageSeat({ stage, turn, current, blocked, d }: {
     </Disclosure>}
   </Disclosure>;
 }
-function TurnSeat({ id, useTurn, d, pending, latest }:
+const FORK_TOAST = "从这句话之前另开对话";
+const FORK_FLASH = "已另开对话";
+const COPY_TOAST = "复制用户原文";
+const COPY_FLASH = "已复制";
+const PLACEHOLDER_HEIGHT = 360;
+const plainPreview = (text: string) =>
+  text.replace(/[#*`>\-\[\]()|_]/g, " ").replace(/\s+/g, " ").trim();
+
+function TipButton({ label, doneLabel, failLabel, onClick, children }: {
+  label: string; doneLabel: string; failLabel?: string;
+  onClick: () => void | Promise<void>; children: ReactNode;
+}) {
+  const [tip, setTip] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [busy, setBusy] = useState(false);
+  return <button type="button" className="focus-tool" aria-label={label} disabled={busy}
+    onClick={async () => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await onClick();
+        setFlash(doneLabel);
+      } catch {
+        setFlash(failLabel || "操作失败");
+      } finally {
+        setBusy(false);
+        setTimeout(() => setFlash(""), 1800);
+      }
+    }}
+    onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+    onFocus={() => setTip(true)} onBlur={() => setTip(false)}>
+    {children}
+    {(flash || tip) && <span className="focus-toast" role="tooltip">{flash || label}</span>}
+  </button>;
+}
+
+function TurnSeat({ id, useTurn, d, pending, latest, forkBeforeSeq, onFork }:
   { id: number; useTurn: ViewProps["useTurn"]; d: Design; pending?: SessionPendingInteraction; latest: boolean;
+    forkBeforeSeq: number | null; onFork?: (seq: number) => void | Promise<void>;
   }) {
   const turn = useTurn(String(id));
   if (!turn) return null;
   const blocked = latest && !!pending;
   const current = turn.stages.find(stage => stage.id === turn.currentStageId);
   const abnormal = turn.state === "closed" && !turn.final;
-  return <article className="focus-turn" data-turn={id}>
-    {turn.startedAt && <div className="focus-time" aria-label="本轮开始时间">
-      {formatTurnTime(turn.startedAt)}
-      {turn.state === "open" && <span> · 已运行 {formatElapsed(Date.now() - turn.startedAt)}</span>}
-    </div>}
-    {turn.users.map(user => <div key={user.id} className="focus-user focus-metal">
-      <Md text={user.text} compact />
-      {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
+  const canFork = !!onFork && forkBeforeSeq !== null;
+  return <article className="focus-turn" data-turn={id} data-mounted="1">
+    {turn.users.map(user => <div key={user.id} className="focus-user-block">
+      <div className="focus-user-row">
+        <div className="focus-tools" aria-label="消息操作">
+          {canFork && <TipButton label={FORK_TOAST} doneLabel={FORK_FLASH} failLabel="另开对话失败"
+            onClick={() => onFork!(forkBeforeSeq!)}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" d="M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5 6v2.5A2.5 2.5 0 0 0 7.5 11H9v1a2 2 0 1 0 2 0V8.5A2.5 2.5 0 0 0 8.5 6H5Zm0 0V4"/>
+            </svg>
+          </TipButton>}
+          <TipButton label={COPY_TOAST} doneLabel={COPY_FLASH} failLabel="复制失败"
+            onClick={async () => {
+              if (!await copyText(user.text)) throw new Error("copy failed");
+            }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" d="M6 2h6a2 2 0 0 1 2 2v6h-1.5V4a.5.5 0 0 0-.5-.5H6V2Zm-3 3h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 1.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V7a.5.5 0 0 0-.5-.5H3Z"/>
+            </svg>
+          </TipButton>
+        </div>
+        <div className="focus-user focus-metal">
+          <Md text={user.text} compact />
+          {user.files.length > 0 && <Md text={user.files.map(name => `- 附件：${name}`).join("\n")} compact />}
+        </div>
+      </div>
+      {turn.startedAt && <div className="focus-user-tips" aria-label="本轮开始时间">
+        {formatTurnTime(turn.startedAt)}
+        {turn.state === "open" && <span> · {formatElapsed(Date.now() - turn.startedAt)}</span>}
+      </div>}
     </div>)}
     <Disclosure id={`process-${id}`} title={`# 1. ${d.content.labels.executionProcess}`} auto
       initial={turn.state === "open" ? d.interaction.runningProcessOpen : d.interaction.processOpen}>
@@ -213,12 +273,17 @@ function TurnSeat({ id, useTurn, d, pending, latest }:
       </section>}
   </article>;
 }
+
+function TurnPlaceholder({ id, height }: { id: number; height: number }) {
+  return <article className="focus-turn focus-turn-placeholder" data-turn={id} data-mounted="0"
+    style={{ minHeight: height }} aria-hidden="true" />;
+}
 export function themeStyle(d: Design, light: boolean): CSSProperties {
   const a = d.appearance, colors = a.themes[light ? "light" : "dark"];
   const style: Record<string, string | number> = {};
+  // Do not bind text / userText / secondary to host label tokens — they are often too light to read.
   const host: Record<string, string> = {
     bg: "--dsw-alias-bg-base", surface: "--dsw-alias-bg-layer-1", bubble: "--dsw-specific-bubble",
-    text: "--dsw-alias-label-primary", secondary: "--dsw-alias-label-secondary",
     border: "--dsw-alias-border-l1"
   };
   Object.entries(colors).forEach(([key, value]) => {
@@ -226,7 +291,18 @@ export function themeStyle(d: Design, light: boolean): CSSProperties {
     style[`--focus-${key}`] = host[key] && value === defaults[key as keyof typeof defaults] ?
       `var(${host[key]},${value})` : value;
   });
+  // MarkdownText hard-codes var(--dsw-alias-label-*); rebind them here or body/bubble stay host-gray.
+  const text = colors.text, userText = colors.userText, secondary = colors.secondary, subtle = colors.subtle;
   Object.assign(style, {
+    "--focus-text": text,
+    "--focus-userText": userText,
+    "--focus-user-text": userText,
+    "--focus-secondary": secondary,
+    "--focus-subtle": subtle,
+    "--dsw-alias-label-primary": text,
+    "--dsw-alias-label-secondary": secondary,
+    "--dsw-alias-label-tertiary": subtle,
+    "--dsw-alias-link": text,
     "--focus-accent": a.accent, "--focus-done": a.statusColors.completed[light ? "light" : "dark"],
     "--focus-failed": a.statusColors.failed, "--focus-warning": a.statusColors.warning,
     "--focus-diagnostic": a.faultPair.diagnostic, "--focus-radius": `${a.metal.bubbleRadiusPx}px`,
@@ -256,8 +332,18 @@ function nativeLight(): boolean {
   if (theme === "dark" || document.documentElement.classList.contains("dark")) return false;
   return !matchMedia("(prefers-color-scheme: dark)").matches;
 }
+function windowAround(order: readonly number[], center: number, radius = 1): Set<number> {
+  const index = order.indexOf(center);
+  const next = new Set<number>();
+  if (index < 0) { next.add(center); return next; }
+  for (let i = Math.max(0, index - radius); i <= Math.min(order.length - 1, index + radius); i++)
+    next.add(order[i]!);
+  return next;
+}
+
 function TurnRail({ items, content, onJump }: {
-  items: readonly TurnNavigationItem[]; content: React.RefObject<HTMLDivElement>; onJump(): void;
+  items: readonly TurnNavigationItem[]; content: React.RefObject<HTMLDivElement | null>;
+  onJump(turn: number): void;
 }) {
   const rail = useRef<HTMLElement>(null), [active, setActive] = useState<number | null>(null);
   useEffect(() => {
@@ -297,23 +383,18 @@ function TurnRail({ items, content, onJump }: {
     }} onPointerLeave={() => rail.current?.querySelectorAll<HTMLElement>(".focus-anchor")
       .forEach(node => node.style.setProperty("--proximity", "0"))}>
     {items.map((item, i) => <button className="focus-anchor" key={item.turn}
-      aria-label={`第 ${i + 1} 轮：${item.prompt || "对话"}`} aria-current={active === item.turn ? "location" : undefined}
-      onClick={() => {
-        const body = content.current, target = body?.querySelector<HTMLElement>(`[data-turn="${item.turn}"]`);
-        if (!body || !target) return;
-        onJump();
-        const el = scrollParent(body);
-        el.scrollTo({ top: el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - 12,
-          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-      }}>
+      aria-label={`第 ${i + 1} 轮：${plainPreview(item.prompt) || "对话"}`}
+      aria-current={active === item.turn ? "location" : undefined}
+      onClick={() => onJump(item.turn)}>
       <span className="focus-anchor-tick" />
       <span className="focus-anchor-preview" aria-hidden="true">
-        <b>{item.prompt || "本轮对话"}</b><span>{item.response || "答复生成中…"}</span>
+        <b>{plainPreview(item.prompt) || "本轮对话"}</b>
+        <span>{plainPreview(item.response) || "答复生成中…"}</span>
       </span>
     </button>)}
   </nav>;
 }
-export function FocusView({ useSettings, usePending, useChat, useTurn, useSession, openFile, loadOlder }: ViewProps) {
+export function FocusView({ useSettings, usePending, useChat, useTurn, useSession, openFile, loadOlder, forkAt }: ViewProps) {
   const settings = useSettings(s => s), pending = usePending(p => p), d = designOf(settings);
   const chat = useChat(s => s), order = useChat(s => s.timeline.turnOrder), hasMore = useSession(s => s.hasMore),
     loadingOlder = useSession(s => s.loadingOlder), openError = useSession(s => s.openError);
@@ -328,7 +409,30 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
   };
   const [light, setLight] = useState(nativeLight), [error, setError] = useState("");
   const content = useRef<HTMLDivElement>(null), follow = useRef(true);
+  const heights = useRef(new Map<number, number>());
+  const [mounted, setMounted] = useState<Set<number>>(() => new Set());
   const navigation = useChat(s => s.navigation.items());
+  const endSeqOf = (id: number) => adaptTurn(chat, id).endSeq;
+
+  useEffect(() => {
+    if (!order.length) { setMounted(new Set()); return; }
+    setMounted(prev => {
+      if (prev.size) {
+        const next = new Set([...prev].filter(id => order.includes(id)));
+        const last = order[order.length - 1]!;
+        if (!next.has(last)) next.add(last);
+        return next.size ? next : windowAround(order, last, 1);
+      }
+      return windowAround(order, order[order.length - 1]!, 1);
+    });
+  }, [order]);
+
+  useEffect(() => {
+    const onMountAll = () => setMounted(new Set(order));
+    window.addEventListener("dsh-stage-chat-preview-mount-all", onMountAll);
+    return () => window.removeEventListener("dsh-stage-chat-preview-mount-all", onMountAll);
+  }, [order]);
+
   useEffect(() => {
     const observer = new MutationObserver(() => setLight(nativeLight()));
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
@@ -340,12 +444,89 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
   useEffect(() => {
     const body = content.current; if (!body) return;
     const el = scrollParent(body);
-    const onScroll = () => { follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; };
+    let raf = 0, pruneTimer = 0;
+
+    const idsNearViewport = (padRatio = 1) => {
+      const box = el.getBoundingClientRect();
+      const pad = box.height * padRatio;
+      const ids: number[] = [];
+      body.querySelectorAll<HTMLElement>("[data-turn]").forEach(node => {
+        const rect = node.getBoundingClientRect();
+        const id = Number(node.dataset.turn);
+        if (!Number.isFinite(id)) return;
+        if (rect.bottom >= box.top - pad && rect.top <= box.bottom + pad) ids.push(id);
+      });
+      return ids;
+    };
+
+    const expandVisible = () => {
+      const visible = idsNearViewport(1.25);
+      if (!visible.length) return;
+      setMounted(prev => {
+        const next = new Set(prev);
+        for (const id of visible) windowAround(order, id, 1).forEach(x => next.add(x));
+        if (order.length) next.add(order[order.length - 1]!);
+        return next;
+      });
+    };
+
+    const pruneFar = () => {
+      const keep = new Set<number>();
+      for (const id of idsNearViewport(1.5)) windowAround(order, id, 1).forEach(x => keep.add(x));
+      if (order.length) keep.add(order[order.length - 1]!);
+      setMounted(prev => {
+        let changed = prev.size !== keep.size;
+        if (!changed) for (const id of prev) if (!keep.has(id)) { changed = true; break; }
+        return changed ? keep : prev;
+      });
+    };
+
+    const onScroll = () => {
+      follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      // Throttle expand: at most once per frame while scrolling.
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; expandVisible(); });
+      // Debounce prune: wait until scrolling settles.
+      clearTimeout(pruneTimer);
+      pruneTimer = window.setTimeout(pruneFar, 160);
+    };
+
     el.addEventListener("scroll", onScroll, { passive: true });
+    expandVisible();
     const observer = new ResizeObserver(() => { if (follow.current) el.scrollTop = el.scrollHeight; });
     observer.observe(body);
-    return () => { observer.disconnect(); el.removeEventListener("scroll", onScroll); };
-  }, []);
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      clearTimeout(pruneTimer);
+    };
+  }, [order]);
+
+  useLayoutEffect(() => {
+    const body = content.current; if (!body) return;
+    body.querySelectorAll<HTMLElement>('.focus-turn[data-mounted="1"]').forEach(node => {
+      const id = Number(node.dataset.turn);
+      if (Number.isFinite(id)) heights.current.set(id, node.offsetHeight);
+    });
+  });
+
+  const jumpToTurn = (turn: number) => {
+    follow.current = false;
+    const body = content.current;
+    if (!body) return;
+    const el = scrollParent(body);
+    setMounted(windowAround(order, turn, 1));
+    // Wait for placeholder → mounted paint, then scroll.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const target = body.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
+      if (!target) return;
+      el.scrollTo({
+        top: el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - 12,
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
+      });
+    }));
+  };
+
   return <ChartTheme.Provider value={light}><MarkdownDelegateProvider renderCode={renderCode} openFile={async path => openFile(path)}
     openExternalLink={url => { window.open(url, "_blank", "noopener,noreferrer"); }}>
     <div data-dsh-stage-chat data-theme={light ? "light" : "dark"} style={themeStyle(d, light)}
@@ -364,7 +545,7 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
         if (!path || /[\u0000-\u001f\u007f]/.test(path)) return;
         event.preventDefault(); event.stopPropagation(); openFile(path);
       }}>
-      <TurnRail items={navigation} content={content} onJump={() => { follow.current = false; }} />
+      <TurnRail items={navigation} content={content} onJump={jumpToTurn} />
       <div className="focus-content" ref={content}>
         {order.length > 0 && <div className="focus-session-actions">
           <CopyButton text={sessionMarkdown} label="复制会话 Markdown" />
@@ -385,8 +566,15 @@ export function FocusView({ useSettings, usePending, useChat, useTurn, useSessio
         {!order.length && <div className="focus-empty"><Md text={template(d, "emptyMessage", {
           title: d.content.labels.emptyTitle, description: d.content.labels.emptyDescription
         })} /></div>}
-        {order.map((id, i) => <TurnSeat key={id} id={id} useTurn={useTurn} d={d}
-          pending={pending} latest={i === order.length - 1} />)}
+        {order.map((id, i) => {
+          const prev = i > 0 ? order[i - 1]! : null;
+          // First turn: cut at 0（丢掉本句及之后）. Later turns: cut after the previous turn.
+          const forkBeforeSeq = prev === null ? 0 : endSeqOf(prev);
+          if (!mounted.has(id))
+            return <TurnPlaceholder key={id} id={id} height={heights.current.get(id) ?? PLACEHOLDER_HEIGHT} />;
+          return <TurnSeat key={id} id={id} useTurn={useTurn} d={d} pending={pending}
+            latest={i === order.length - 1} forkBeforeSeq={forkBeforeSeq} onFork={forkAt} />;
+        })}
       </div>
     </div>
   </MarkdownDelegateProvider></ChartTheme.Provider>;

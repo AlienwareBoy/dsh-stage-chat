@@ -1,13 +1,70 @@
 import defaults from "../dsh-stage-chat-config.json";
 import defaultPrompt from "../dsh-stage-chat-output-prompt.md";
+import designEditPrompt from "./design-edit-prompt.md";
 import legacy from "./legacy-design.json";
 import legacyPrompt from "./legacy-output-prompt.md";
 
-export { defaultPrompt, defaults as defaultDesign };
+export { defaultPrompt, defaults as defaultDesign, designEditPrompt };
 export const NAMESPACE = "focus";
 export type Design = typeof defaults;
 export interface Settings { json?: string; outputPrompt?: string; strictStages?: boolean; agents?: string; }
-export const defaultJson = JSON.stringify(defaults, null, 2);
+
+function orderKeys<T extends Record<string, unknown>>(obj: T, keys: readonly string[]): T {
+  const out: Record<string, unknown> = {};
+  for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj, key)) out[key] = obj[key];
+  for (const key of Object.keys(obj)) if (!Object.prototype.hasOwnProperty.call(out, key)) out[key] = obj[key];
+  return out as T;
+}
+
+const THEME_KEY_ORDER = [
+  "text", "userText", "secondary", "subtle", "bg", "surface", "sidebar", "bubble",
+  "border", "hover", "node-line", "metal-top", "metal-mid", "metal-bottom",
+  "metal-edge-high", "metal-edge-mid", "metal-edge-low", "metal-edge-glint",
+  "metal-edge-shade", "metal-shine", "metal-inset", "metal-shadow"
+] as const;
+
+const APPEARANCE_KEY_ORDER = [
+  "defaultTheme", "themes", "accent", "accentBackground", "statusColors", "faultPair",
+  "typography", "fonts", "layout", "metal", "motion"
+] as const;
+
+const ROOT_KEY_ORDER = [
+  "format", "version", "target", "appearance", "interaction", "content",
+  "pluginSettings", "initialState", "dataContract", "preview"
+] as const;
+
+const CONTENT_KEY_ORDER = ["labels", "templates", "markdown", "rules"] as const;
+
+/** Put high-priority edit targets first so the settings JSON is scannable. */
+export function orderedDesign(d: Design): Design {
+  const themes = {
+    light: orderKeys({ ...d.appearance.themes.light }, THEME_KEY_ORDER),
+    dark: orderKeys({ ...d.appearance.themes.dark }, THEME_KEY_ORDER)
+  };
+  const appearance = orderKeys({ ...d.appearance, themes }, APPEARANCE_KEY_ORDER);
+  const content = orderKeys({ ...d.content }, CONTENT_KEY_ORDER);
+  return orderKeys({ ...d, appearance, content }, ROOT_KEY_ORDER) as Design;
+}
+
+export function designJson(d: Design = defaults): string {
+  return JSON.stringify(orderedDesign(d), null, 2);
+}
+
+export const defaultJson = designJson(defaults);
+
+/** Clipboard package: edit instructions + current JSON. */
+export function designEditClipboard(json: string): string {
+  return [
+    designEditPrompt.trim(),
+    "",
+    "## 当前完整 JSON",
+    "",
+    "```json",
+    json.trim(),
+    "```",
+    ""
+  ].join("\n");
+}
 export function outputPromptOf(value?: string): string {
   return value === undefined || value.trim() === legacyPrompt.trim() ? defaultPrompt : value;
 }
@@ -54,6 +111,16 @@ export function parseDesign(text: string): Design {
     throw new Error("状态色与强调色必须是 #RRGGBB。");
   const cssColor = (s: unknown) => typeof s === "string" &&
     (/^#[\da-f]{3,8}$/i.test(s) || /^rgba?\([\d\s.,%]+\)$/i.test(s));
+  // Fill newly introduced theme keys so older saved JSON keeps working.
+  for (const theme of ["light", "dark"] as const) {
+    const themeColors = a.themes?.[theme];
+    if (!object(themeColors)) throw new Error(`主题 ${theme} 缺少颜色表。`);
+    for (const key of Object.keys(defaults.appearance.themes[theme]) as
+        (keyof typeof defaults.appearance.themes.light)[]) {
+      if (!cssColor(themeColors[key]))
+        (themeColors as Record<string, string>)[key] = defaults.appearance.themes[theme][key];
+    }
+  }
   for (const theme of ["light", "dark"] as const)
     for (const key of Object.keys(defaults.appearance.themes[theme]))
       if (!cssColor(a.themes?.[theme]?.[key as keyof typeof a.themes.light]))
@@ -95,6 +162,14 @@ export function parseDesign(text: string): Design {
   }
   for (const key of Object.keys(legacy.layout) as (keyof typeof legacy.layout)[]) {
     if (d.appearance.layout[key] === legacy.layout[key]) d.appearance.layout[key] = defaults.appearance.layout[key];
+  }
+  // Previous soft light defaults were hard to read; upgrade to current high-contrast blacks.
+  const softLight: Partial<Record<keyof typeof defaults.appearance.themes.light, string>> = {
+    text: "#202124", userText: "#202124", secondary: "#60646C", subtle: "#8B8F97"
+  };
+  for (const [key, soft] of Object.entries(softLight) as [keyof typeof softLight, string][]) {
+    if (d.appearance.themes.light[key] === soft)
+      d.appearance.themes.light[key] = defaults.appearance.themes.light[key];
   }
   return d;
 }

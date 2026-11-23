@@ -7,7 +7,7 @@ dsh-stage-chat 是 DeepSeek Harness 的阶段式对话视图。插件替换内�
 | 项目 | 说明 |
 | --- | --- |
 | 包名 | `dsh-stage-chat` |
-| 当前版本 | 0.1.7 |
+| 当前版本 | 0.1.8 |
 | 兼容范围 | DeepSeek Harness 0.2.2-rc.5 及更早版本 |
 | 接入位置 | `chat`，优先级 `-100` |
 | 许可 | [MIT](LICENSE) |
@@ -71,5 +71,5 @@ npm pack
 上述命令不会启动 Harness。生成的安装包可在本地安装：
 
 ```bash
-dsh plugin --profile web add ./dsh-stage-chat-0.1.7.tgz
+dsh plugin --profile web add ./dsh-stage-chat-0.1.8.tgz
 ```

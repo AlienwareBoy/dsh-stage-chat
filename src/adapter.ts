@@ -19,6 +19,8 @@ export interface Turn {
   result: string; reportedProcess: string; confirmation: string;
   stages: Stage[]; currentStageId: string | null;
   startedAt: number | null;
+  /** Host turn-end seq for fork; null when the turn is open or the host omits it. */
+  endSeq: number | null;
 }
 function stageTitle(text: string): string {
   return text.split("\n").map(line => line.trim()).find(Boolean)
@@ -149,7 +151,10 @@ export function adaptTurn(chat: ChatSnapshot, id: number): Turn {
   return { id, users, items, progress, final, partial, state, reason, errors, ...splitAnswer(final),
     generating: isGenerating, focusId, stages, currentStageId,
     // Hosts older than rc.5 may not publish legacy timings; absence means no time label.
-    startedAt: chat.legacy?.turnTimings?.get(id)?.startTime ?? null };
+    startedAt: chat.legacy?.turnTimings?.get(id)?.startTime ?? null,
+    endSeq: chat.legacy?.turnEnds?.get(id) ??
+      (typeof (location as { end?: { seq?: number } } | undefined)?.end?.seq === "number"
+        ? (location as { end: { seq: number } }).end.seq : null) };
 }
 
 /** Per-turn subscriptions include in-place tool-argument changes and turn/end updates. */
